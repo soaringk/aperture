@@ -1,73 +1,84 @@
-# React + TypeScript + Vite
+# Personal Multi-task LLM Assistant
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A unified Single Page Application (SPA) designed to consolidate various conversational tools into one premium interface. Built with React, TypeScript, and Vite.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Unified Interface**: Access multiple specialized AI tools from a single sidebar.
+- **Persistent History**: All conversations and messages are stored locally using IndexedDB. Use it across sessions without losing context.
+- **Multi-Provider Support**: Switch seamlessly between **Google Gemini** and **OpenAI** (or compatible) providers.
+- **Privacy First**: Data lives in your browser. API Keys are stored in local environment variables.
+- **Specialized Apps**:
+  - **随身翻译官 (Translator)**: Context-aware translation.
+  - **措辞与关系顾问 (Wording Advisor)**: Advice on professional and personal communication.
+  - **社交媒体表达器 (Social Media Expressor)**: Generate high-engagement posts.
+  - **深度导读生成器 (Deep Reader)**: Summarize and analyze long texts.
 
-## React Compiler
+## Tech Stack
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **Frontend**: React, TypeScript, Vite
+- **Styling**: Vanilla CSS (Variables, Dark/Light mode support)
+- **State Management**: Custom React Hooks
+- **Persistence**: `idb` (IndexedDB)
+- **AI Integration**: `@google/genai` and `openai` SDKs
 
-## Expanding the ESLint configuration
+## Getting Started
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### Prerequisites
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+- Node.js (v18+)
+- npm or yarn
+- An API Key (Gemini or OpenAI)
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+### Installation
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+1.  Clone the repository.
+2.  Install dependencies:
+    ```bash
+    npm install
+    ```
+
+### Configuration
+
+1.  Copy the example environment file:
+    ```bash
+    cp .env.example .env
+    ```
+2.  Edit `.env` to configure your provider:
+
+    **For Google Gemini (Default):**
+    ```env
+    VITE_LLM_PROVIDER=gemini
+    VITE_LLM_API_KEY=your_gemini_api_key
+    VITE_LLM_MODEL=gemini-1.5-flash
+    ```
+
+    **For OpenAI:**
+    ```env
+    VITE_LLM_PROVIDER=openai
+    VITE_LLM_API_KEY=your_openai_api_key
+    VITE_LLM_MODEL=gpt-4o
+    VITE_LLM_BASE_URL=https://api.openai.com/v1  # Optional: for proxies
+    ```
+
+### Running Locally
+
+Start the development server:
+
+```bash
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Open [http://localhost:5173](http://localhost:5173) in your browser.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+### Building for Production
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm run build
 ```
+
+The output will be in the `dist` directory.
+
+## License
+
+MIT
