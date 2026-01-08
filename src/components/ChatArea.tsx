@@ -24,7 +24,7 @@ interface ChatAreaProps {
  */
 const SmoothStreaming: React.FC<{ content: string; isLoading: boolean }> = ({ content, isLoading }) => {
     const [displayedContent, setDisplayedContent] = useState('');
-    const timerRef = useRef<NodeJS.Timeout | null>(null);
+    const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
         if (!content) {
