@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/http"
 
+	"time"
+
 	"github.com/soaringk/aperture/server/pkg/logger"
 	"go.uber.org/zap"
 	"google.golang.org/genai"
@@ -15,6 +17,26 @@ import (
 type GeminiProvider struct {
 	client *genai.Client
 	model  string
+}
+
+// OpenAIChunk represents standard chat completion chunk
+type OpenAIChunk struct {
+	ID      string   `json:"id"`
+	Object  string   `json:"object"`
+	Created int64    `json:"created"`
+	Model   string   `json:"model"`
+	Choices []Choice `json:"choices"`
+}
+
+type Choice struct {
+	Index        int     `json:"index"`
+	Delta        Delta   `json:"delta"`
+	FinishReason *string `json:"finish_reason"`
+}
+
+type Delta struct {
+	Content string `json:"content,omitempty"`
+	Role    string `json:"role,omitempty"`
 }
 
 // NewGeminiProvider creates a Gemini provider with initialized client
@@ -35,7 +57,7 @@ func NewGeminiProvider(cfg Config) (*GeminiProvider, error) {
 }
 
 // Stream handles streaming content generation
-func (p *GeminiProvider) Stream(w http.ResponseWriter, req ChatRequest) {
+func (p *GeminiProvider) Stream(w http.ResponseWriter, req ChatRequest) error {
 	log := logger.L()
 
 	// Parse messages and convert to Gemini format
@@ -45,8 +67,7 @@ func (p *GeminiProvider) Stream(w http.ResponseWriter, req ChatRequest) {
 	}
 	if err := json.Unmarshal(req.Messages, &rawMessages); err != nil {
 		log.Error("Failed to parse messages", zap.Error(err))
-		http.Error(w, "Invalid messages format", http.StatusBadRequest)
-		return
+		return fmt.Errorf("invalid messages format: %w", err)
 	}
 
 	var contents []*genai.Content
@@ -79,16 +100,54 @@ func (p *GeminiProvider) Stream(w http.ResponseWriter, req ChatRequest) {
 	ctx := context.Background()
 	stream := p.client.Models.GenerateContentStream(ctx, p.model, contents, config)
 
+	// Generate a stable ID for this stream
+	id := fmt.Sprintf("chatcmpl-%d", time.Now().UnixNano())
+	created := time.Now().Unix()
+
+	hasWritten := false
 	for resp, err := range stream {
 		if err != nil {
 			log.Error("Gemini stream error", zap.Error(err))
-			break
+			if !hasWritten {
+				return err
+			}
+			// Send mid-stream error as a special event
+			fmt.Fprintf(w, "event: error\ndata: %s\n\n", err.Error())
+			if f, ok := w.(http.Flusher); ok {
+				f.Flush()
+			}
+			return nil
 		}
+
 		for _, cand := range resp.Candidates {
 			if cand.Content != nil {
 				for _, part := range cand.Content.Parts {
 					if part.Text != "" {
-						w.Write([]byte(part.Text))
+						chunk := OpenAIChunk{
+							ID:      id,
+							Object:  "chat.completion.chunk",
+							Created: created,
+							Model:   p.model,
+							Choices: []Choice{
+								{
+									Index: 0,
+									Delta: Delta{
+										Content: part.Text,
+									},
+								},
+							},
+						}
+
+						if !hasWritten {
+							// For the first chunk, logic usually requires role, but OpenAI often sends role in first chunk and content in subsequent.
+							// We'll mimic sending content immediately as that's what we have.
+							// Alternatively we can send an initial role chunk.
+							// For simplicity and compatibility, we just send content.
+							hasWritten = true
+						}
+
+						data, _ := json.Marshal(chunk)
+						fmt.Fprintf(w, "data: %s\n\n", data)
 						if f, ok := w.(http.Flusher); ok {
 							f.Flush()
 						}
@@ -97,4 +156,12 @@ func (p *GeminiProvider) Stream(w http.ResponseWriter, req ChatRequest) {
 			}
 		}
 	}
+
+	// Send [DONE]
+	fmt.Fprintf(w, "data: [DONE]\n\n")
+	if f, ok := w.(http.Flusher); ok {
+		f.Flush()
+	}
+
+	return nil
 }

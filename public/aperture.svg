@@ -1,0 +1,59 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Soft Shadow for Depth -->
+  <filter id="soft-shadow" x="-50%" y="-50%" width="200%" height="200%">
+    <feGaussianBlur in="SourceAlpha" stdDeviation="10" result="blur"/>
+    <feOffset in="blur" dx="0" dy="8" result="offsetBlur"/>
+    <feFlood flood-color="#000000" flood-opacity="0.1" result="color"/>
+    <feComposite in="color" in2="offsetBlur" operator="in"/>
+    <feMerge>
+      <feMergeNode/>
+      <feMergeNode in="SourceGraphic"/>
+    </feMerge>
+  </filter>
+
+  <!-- Background: Rounded Square with Neumorphic/Glassy White -->
+  <rect x="32" y="32" width="448" height="448" rx="100" fill="url(#bg-gradient)" filter="url(#soft-shadow)"/>
+  <rect x="32" y="32" width="448" height="448" rx="100" stroke="white" stroke-opacity="0.5" stroke-width="2"/>
+
+  <!-- Aperture Iris Group -->
+  <g transform="translate(256, 256) scale(0.85)">
+    <!-- Core Glow -->
+    <circle cx="0" cy="0" r="80" fill="url(#core-gradient)" filter="url(#blur-core)" opacity="0.8"/>
+    <circle cx="0" cy="0" r="60" fill="white" opacity="0.3"/>
+
+    <!-- Six Blades -->
+    <g id="blades">
+      <path d="M0,-160 C80,-160 140,-100 140,0 L0,0 Z" fill="url(#blade-gradient)" stroke="white" stroke-width="2" stroke-opacity="0.6" transform="rotate(0)"/>
+      <path d="M0,-160 C80,-160 140,-100 140,0 L0,0 Z" fill="url(#blade-gradient)" stroke="white" stroke-width="2" stroke-opacity="0.6" transform="rotate(60)"/>
+      <path d="M0,-160 C80,-160 140,-100 140,0 L0,0 Z" fill="url(#blade-gradient)" stroke="white" stroke-width="2" stroke-opacity="0.6" transform="rotate(120)"/>
+      <path d="M0,-160 C80,-160 140,-100 140,0 L0,0 Z" fill="url(#blade-gradient)" stroke="white" stroke-width="2" stroke-opacity="0.6" transform="rotate(180)"/>
+      <path d="M0,-160 C80,-160 140,-100 140,0 L0,0 Z" fill="url(#blade-gradient)" stroke="white" stroke-width="2" stroke-opacity="0.6" transform="rotate(240)"/>
+      <path d="M0,-160 C80,-160 140,-100 140,0 L0,0 Z" fill="url(#blade-gradient)" stroke="white" stroke-width="2" stroke-opacity="0.6" transform="rotate(300)"/>
+    </g>
+  </g>
+
+  <!-- Definitions -->
+  <defs>
+    <!-- Background Gradient: Subtle Light Gray to White -->
+    <linearGradient id="bg-gradient" x1="32" y1="32" x2="480" y2="480" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#F5F7FA"/>
+      <stop offset="100%" stop-color="#E4E7EB"/>
+    </linearGradient>
+
+    <!-- Core Blue Gradient -->
+    <radialGradient id="core-gradient" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(0 0) rotate(90) scale(80)">
+      <stop offset="0%" stop-color="#60A5FA"/>
+      <stop offset="100%" stop-color="#3B82F6" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Blade Gradient: Glassy Look -->
+    <linearGradient id="blade-gradient" x1="0" y1="-160" x2="140" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="white" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#F3F4F6" stop-opacity="0.4"/>
+    </linearGradient>
+
+    <filter id="blur-core">
+      <feGaussianBlur stdDeviation="8"/>
+    </filter>
+  </defs>
+</svg>

@@ -3,6 +3,7 @@ package sdk
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/openai/openai-go"
@@ -32,7 +33,7 @@ func NewOpenAIProvider(cfg Config) (*OpenAIProvider, error) {
 }
 
 // Stream handles streaming chat completion
-func (p *OpenAIProvider) Stream(w http.ResponseWriter, req ChatRequest) {
+func (p *OpenAIProvider) Stream(w http.ResponseWriter, req ChatRequest) error {
 	log := logger.L()
 
 	// Parse messages
@@ -43,8 +44,7 @@ func (p *OpenAIProvider) Stream(w http.ResponseWriter, req ChatRequest) {
 	}
 	if err := json.Unmarshal(req.Messages, &rawMessages); err != nil {
 		log.Error("Failed to parse messages", zap.Error(err))
-		http.Error(w, "Invalid messages format", http.StatusBadRequest)
-		return
+		return err
 	}
 
 	for _, m := range rawMessages {
@@ -69,12 +69,14 @@ func (p *OpenAIProvider) Stream(w http.ResponseWriter, req ChatRequest) {
 		Model:    p.model,
 	})
 
+	hasWritten := false
 	for stream.Next() {
 		chunk := stream.Current()
 		if len(chunk.Choices) > 0 {
 			content := chunk.Choices[0].Delta.Content
 			if content != "" {
-				w.Write([]byte(content))
+				hasWritten = true
+				fmt.Fprintf(w, "data: %s\n\n", content)
 				if f, ok := w.(http.Flusher); ok {
 					f.Flush()
 				}
@@ -84,5 +86,14 @@ func (p *OpenAIProvider) Stream(w http.ResponseWriter, req ChatRequest) {
 
 	if err := stream.Err(); err != nil {
 		log.Error("OpenAI stream error", zap.Error(err))
+		if !hasWritten {
+			return err
+		}
+		// Send mid-stream error to client
+		fmt.Fprintf(w, "error: %s\n\n", err.Error())
+		if f, ok := w.(http.Flusher); ok {
+			f.Flush()
+		}
 	}
+	return nil
 }

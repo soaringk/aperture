@@ -43,19 +43,36 @@ class LLMService implements LLMStrategy {
 
             buffer += decoder.decode(value, { stream: true });
 
-            // SSE blocks are separated by double newlines
             let boundary = buffer.indexOf('\n\n');
             while (boundary !== -1) {
                 const block = buffer.slice(0, boundary).trim();
                 buffer = buffer.slice(boundary + 2);
 
+                if (block.startsWith('event: error')) {
+                    // Parse error data if available, usually next line "data: ..."
+                    // But based on our server implementation: "event: error\ndata: %s\n\n"
+                    const dataLine = block.split('\n').find(line => line.startsWith('data: '));
+                    const errorMsg = dataLine ? dataLine.slice(6) : 'Unknown stream error';
+                    throw new Error(errorMsg);
+                }
+
                 if (block.startsWith('data: ')) {
                     const content = block.slice(6);
-                    fullText += content;
-                    if (onStream) onStream(content);
-                } else if (block.startsWith('error: ')) {
-                    const error = block.slice(7);
-                    throw new Error(error);
+                    if (content === '[DONE]') {
+                        return fullText;
+                    }
+
+                    try {
+                        const chunk = JSON.parse(content);
+                        // OpenAI format: choices[0].delta.content
+                        const delta = chunk.choices?.[0]?.delta?.content;
+                        if (delta) {
+                            fullText += delta;
+                            if (onStream) onStream(delta);
+                        }
+                    } catch (e) {
+                        console.warn('Failed to parse SSE chunk', e);
+                    }
                 }
 
                 boundary = buffer.indexOf('\n\n');

@@ -21,7 +21,7 @@ type ChatRequest struct {
 
 // Provider interface for LLM providers
 type Provider interface {
-	Stream(w http.ResponseWriter, req ChatRequest)
+	Stream(w http.ResponseWriter, req ChatRequest) error
 }
 
 // NewProvider creates and initializes the appropriate provider based on config

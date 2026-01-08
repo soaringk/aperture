@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/joho/godotenv"
 	"github.com/rs/cors"
@@ -79,11 +80,42 @@ func handleChat(w http.ResponseWriter, r *http.Request) {
 		zap.String("model", cfg.LLM.Model),
 	)
 
-	// Set SSE headers
+	// We set headers only if we are successful, or let it fall through to http.Error
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
 
 	// Use pre-initialized provider (client reused, concurrency-safe)
-	provider.Stream(w, req)
+	if err := provider.Stream(w, req); err != nil {
+		log.Error("Stream failed (initial)", zap.Error(err))
+
+		w.Header().Set("Content-Type", "application/json")
+
+		// Map error to status code
+		statusCode := http.StatusInternalServerError
+		errMsg := err.Error()
+
+		switch {
+		case strings.Contains(errMsg, "429") || strings.Contains(errMsg, "quota") || strings.Contains(errMsg, "resource exhausted"):
+			statusCode = http.StatusTooManyRequests
+		case strings.Contains(errMsg, "401") || strings.Contains(errMsg, "unauthenticated") || strings.Contains(errMsg, "invalid api key") || strings.Contains(errMsg, "API key not valid"):
+			statusCode = http.StatusUnauthorized
+		case strings.Contains(errMsg, "403") || strings.Contains(errMsg, "permission denied"):
+			statusCode = http.StatusForbidden
+		case strings.Contains(errMsg, "400") || strings.Contains(errMsg, "invalid argument"):
+			statusCode = http.StatusBadRequest
+		}
+
+		w.WriteHeader(statusCode)
+
+		// Send JSON error response matching OpenAI error format
+		jsonError := map[string]interface{}{
+			"error": map[string]interface{}{
+				"message": errMsg,
+				"type":    "server_error",
+				"code":    statusCode,
+			},
+		}
+		json.NewEncoder(w).Encode(jsonError)
+	}
 }
