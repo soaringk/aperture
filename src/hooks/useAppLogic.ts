@@ -1,19 +1,21 @@
 import { useState, useEffect, useCallback } from 'react';
-import { db } from '../core/db';
-import { llm } from '../core/llm';
-import { APPS } from '../config/apps';
-import type { Conversation, Message } from '../core/types';
+import { db } from '@/core/db';
+import { llm } from '@/core/llm';
+import { logger } from '@/core/logger';
+import { APPS } from '@/config/apps';
+import type { Conversation, Message, Attachment } from '@/core/types';
 
 export function useAppLogic() {
-    const [currentAppId, setCurrentAppId] = useState<string>(APPS[0].id);
+    const [currentAppId, setCurrentAppId] = useState<string | null>(null);
     const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
     const [conversations, setConversations] = useState<Conversation[]>([]);
     const [messages, setMessages] = useState<Message[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [streamingContent, setStreamingContent] = useState('');
+    const [error, setError] = useState<string | null>(null);
 
-    // computed
-    const currentApp = APPS.find(a => a.id === currentAppId) || APPS[0];
+    // computed - null means show tool picker
+    const currentApp = currentAppId ? APPS.find(a => a.id === currentAppId) || null : null;
 
     // Load history list
     const loadHistory = useCallback(async () => {
@@ -34,37 +36,38 @@ export function useAppLogic() {
         const loadMsgs = async () => {
             const msgs = await db.getMessages(currentConversationId);
             setMessages(msgs);
+            // Auto-set appId if not set
+            const conv = await db.getConversation(currentConversationId);
+            if (conv && conv.appId !== currentAppId) {
+                setCurrentAppId(conv.appId);
+            }
         };
         loadMsgs();
-    }, [currentConversationId]);
+    }, [currentConversationId, currentAppId]);
 
     // Create new chat
     const startNewChat = async (appId: string) => {
         const app = APPS.find(a => a.id === appId) || APPS[0];
-        // We don't create the DB entry until the first message usually,
-        // OR we create it immediately. Let's create immediately for simplicity to have an ID.
-        const conv = await db.createConversation(app.id, `New ${app.title} Chat`);
-        setConversations(prev => [conv, ...prev]);
         setCurrentAppId(app.id);
-        setCurrentConversationId(conv.id);
+        setCurrentConversationId(null);
         setMessages([]);
+        setError(null);
+        setStreamingContent('');
     };
 
-    // Switch App (in current chat or new chat)
-    // PRD: "App switching doesn't jump page, just switches config for current session"
-    // But usage of 'New Chat' vs 'Switch Config' is subtle.
-    // For now: Clicking sidebar app = New Chat.
-    // Dropdown in header = Switch Config (Not implemented yet).
-    // Let's implement Sidebar App Click = Start New Chat.
+    const generateXmlTags = (tags: string[]) => {
+        return tags.map(t => `<context>${t}</context>`).join('\n');
+    };
 
     // Send Message
-    const sendMessage = async (text: string, tags: string[] = []) => {
-        if (!text.trim()) return;
+    const sendMessage = async (text: string, tags: string[] = [], attachments: Attachment[] = []) => {
+        if ((!text.trim() && attachments.length === 0) || !currentAppId || !currentApp) return;
+        setError(null);
 
         let convId = currentConversationId;
         if (!convId) {
-            // Should have been created by startNewChat, but just in case
-            const conv = await db.createConversation(currentAppId, text.slice(0, 20));
+            const previewText = text.trim() ? text.slice(0, 20) : (attachments[0]?.name || 'File Attachment');
+            const conv = await db.createConversation(currentAppId!, previewText);
             convId = conv.id;
             setCurrentConversationId(convId);
             setConversations(prev => [conv, ...prev]);
@@ -75,7 +78,8 @@ export function useAppLogic() {
             role: 'user',
             content: text,
             createdAt: Date.now(),
-            tags
+            tags,
+            attachments
         };
         const savedUserMsg = await db.addMessage(convId, userMsg);
         setMessages(prev => [...prev, savedUserMsg]);
@@ -84,42 +88,22 @@ export function useAppLogic() {
         setIsLoading(true);
         setStreamingContent('');
 
-        // Construct history for LLM (exclude the one we just added to local state to avoid dupes if we passed it differently, but here we just pass current confirmed messages)
-        // Actually we need to include the new message in what we send to LLM
-        // const historyForLlm = [...messages, savedUserMsg];
-
         try {
-            // 3. System Prompt preparation
-            // Inject tags into system prompt or user message?
-            // PRD says: "User selects tags -> XML tags injected into final request"
-            // We can append tags to the user message content OR format them.
-            // Let's append them to the user text in the LLM view if they are not visible?
-            // "Input area supports... tags... client converts to XML and injects"
-            // Let's create a "formatted content" for the LLM.
-
+            // 3. System Prompt & Context
             let finalPrompt = text;
             if (tags.length > 0) {
-                // Simple XML mapping
-                // e.g. <lang>ru</lang>, <context>airport</context>
-                // We need a mapping from Tag Label to XML.
-                // For now, let's just assume the tag string IS the value or we format it.
-                // PRD: "User inputs 'Airport' -> <context>airport</context>"
-                // Use a simple helper or just wrap them.
-                const xmlTags = tags.map(t => `<tag>${t}</tag>`).join('\n'); // Simplified for now
+                const xmlTags = generateXmlTags(tags);
                 finalPrompt = `${xmlTags}\n${text}`;
             }
 
-            // We call LLM with history.
-            // Note: `llm.chat` handles `history` + `newMessage`.
-            // `history` arg should be PREVIOUS messages.
-
             const assistantResponseText = await llm.chat(
-                messages, // Pass previous messages
-                finalPrompt, // Pass new message with injected tags
+                messages,
+                finalPrompt,
                 currentApp.systemPrompt,
                 (chunk: string) => {
                     setStreamingContent(prev => prev + chunk);
-                }
+                },
+                attachments
             );
 
             // 4. Save Assistant Message
@@ -132,21 +116,24 @@ export function useAppLogic() {
             const savedAssistantMsg = await db.addMessage(convId, assistantMsg);
             setMessages(prev => [...prev, savedAssistantMsg]);
 
-            // Update title if it's the first exchange?
+            // Update title if it's the first exchange
             if (messages.length === 0) {
-                // Generate title logic or just use user text
-                await db.updateConversation(convId, { title: text.slice(0, 30) });
-                loadHistory(); // refresh list
+                const titleText = text.trim() ? text.slice(0, 30) : (attachments[0]?.name || 'New Chat');
+                await db.updateConversation(convId, { title: titleText });
+                loadHistory();
             }
 
-        } catch (e) {
-            console.error(e);
-            // TODO: Handle error UI
+        } catch (e: unknown) {
+            const err = e as Error;
+            logger.error('LLM request failed', err);
+            setError(err.message || 'Request failed');
         } finally {
             setIsLoading(false);
             setStreamingContent('');
         }
     };
+
+    const clearError = () => setError(null);
 
     return {
         currentApp,
@@ -155,9 +142,12 @@ export function useAppLogic() {
         messages,
         isLoading,
         streamingContent,
+        lastMessage: messages[messages.length - 1],
+        error,
         startNewChat,
         loadHistory,
         sendMessage,
-        setCurrentConversationId
+        setCurrentConversationId,
+        clearError
     };
 }

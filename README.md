@@ -4,9 +4,11 @@ A unified Single Page Application (SPA) designed to consolidate various conversa
 
 ## Features
 
-- **Unified Interface**: Access multiple specialized AI tools from a single sidebar.
-- **Persistent History**: All conversations and messages are stored locally using IndexedDB. Use it across sessions without losing context.
-- **Multi-Provider Support**: Switch seamlessly between **Google Gemini** and **OpenAI** (or compatible) providers.
+- **Unified Interface**: Access multiple specialized AI tools from a single sidebar with a glassmorphism design.
+- **Silky Smooth Streaming**: Character-by-character text animation for a natural, typewriter-like reading experience.
+- **Multi-modal Support**: Upload images, PDFs, and text files directly into the chat for advanced analysis and multi-modal conversations.
+- **Persistent History**: All conversations, messages, and attachments are stored locally using IndexedDB. Use it across sessions without losing context.
+- **Multi-Provider Support**: Switch seamlessly between **Google Gemini** and **OpenAI** (or compatible) providers with full multi-modal payload support.
 - **Privacy First**: Data lives in your browser. API Keys are stored in local environment variables.
 - **Specialized Apps**:
   - **随身翻译官 (Translator)**: Context-aware translation.
@@ -49,16 +51,17 @@ A unified Single Page Application (SPA) designed to consolidate various conversa
     **For Google Gemini (Default):**
     ```env
     VITE_LLM_PROVIDER=gemini
+    VITE_LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta
     VITE_LLM_API_KEY=your_gemini_api_key
-    VITE_LLM_MODEL=gemini-1.5-flash
+    VITE_LLM_MODEL=gemini-3-flash-preview
     ```
 
     **For OpenAI:**
     ```env
     VITE_LLM_PROVIDER=openai
+    VITE_LLM_BASE_URL=https://api.openai.com/v1
     VITE_LLM_API_KEY=your_openai_api_key
     VITE_LLM_MODEL=gpt-4o
-    VITE_LLM_BASE_URL=https://api.openai.com/v1  # Optional: for proxies
     ```
 
 ### Running Locally

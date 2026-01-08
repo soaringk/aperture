@@ -1,10 +1,18 @@
+export interface Attachment {
+    name: string;
+    mimeType: string;
+    data: string; // Base64 or Blob URL (for local persistence, base64 is safer in IDB)
+}
+
 export interface Message {
     id: string;
+    conversationId: string;
     role: 'user' | 'assistant' | 'system';
     content: string;
     createdAt: number;
     tags?: string[]; // XML tags extracted or applied
-    meta?: Record<string, any>; // For attachments or extra info
+    meta?: Record<string, unknown>; // For attachments or extra info
+    attachments?: Attachment[];
 }
 
 export interface Conversation {

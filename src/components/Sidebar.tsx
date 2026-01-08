@@ -1,151 +1,194 @@
 import React, { useState } from 'react';
-import { Search, MessageSquare, Plus } from 'lucide-react';
-import { APPS } from '../config/apps';
-import type { Conversation } from '../core/types';
+import { Search, ChevronLeft, ChevronRight, MessageSquare } from 'lucide-react';
+import { APPS } from '@/config/apps';
+import type { Conversation } from '@/core/types';
 
 interface SidebarProps {
     conversations: Conversation[];
     currentConversationId: string | null;
     onNewChat: (appId: string) => void;
     onSelectConversation: (id: string) => void;
-    onSearch: (query: string) => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
     conversations,
     currentConversationId,
     onNewChat,
-    onSelectConversation,
-    onSearch
+    onSelectConversation
 }) => {
     const [searchTerm, setSearchTerm] = useState('');
+
+    const [isCollapsed, setIsCollapsed] = useState(false);
 
     const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
         const val = e.target.value;
         setSearchTerm(val);
-        onSearch(val);
     };
 
-    const formatTime = (ts: number) => {
-        const date = new Date(ts);
-        // Simple logic: if today, show time; else show date
-        if (new Date().toDateString() === date.toDateString()) {
-            return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        }
-        return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
-    };
+    const filteredConversations = conversations.filter(c =>
+        !searchTerm || c.title.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+
 
     return (
         <aside style={{
-            width: 'var(--sidebar-width)',
+            width: isCollapsed ? '70px' : 'var(--sidebar-width)',
             backgroundColor: 'var(--bg-secondary)',
-            borderRight: '1px solid var(--border-light)',
+            borderRight: '1px solid var(--border-subtle)',
             display: 'flex',
             flexDirection: 'column',
-            padding: '16px 0',
-            flexShrink: 0
+            height: '100%',
+            overflow: 'hidden',
+            transition: 'width 0.3s ease'
         }}>
-            {/* Search Bar */}
-            <div style={{ padding: '0 16px 16px' }}>
-                <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    backgroundColor: 'var(--bg-tertiary)',
-                    padding: '8px 12px',
-                    borderRadius: 'var(--radius-md)',
-                    border: '1px solid var(--border-subtle)'
-                }}>
-                    <Search size={16} color="var(--text-secondary)" />
-                    <input
-                        type="text"
-                        placeholder="Search history..."
-                        className="input-reset"
-                        style={{ marginLeft: '8px', width: '100%', fontSize: '0.9rem' }}
-                        value={searchTerm}
-                        onChange={handleSearch}
-                    />
-                </div>
+            {/* Collapse Toggle - Floating or Fixed? Fixed at bottom or top. Let's put in Search row or separate */}
+
+            {/* Top Bar: Search + Collapse Toggle */}
+            <div style={{
+                padding: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                borderBottom: isCollapsed ? 'none' : '1px solid transparent' // Cleaner look
+            }}>
+                {/* Search Box */}
+                {!isCollapsed ? (
+                    <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        backgroundColor: '#fff',
+                        padding: '8px 12px',
+                        borderRadius: '8px',
+                        border: '1px solid var(--border-subtle)',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
+                        flex: 1
+                    }}>
+                        <Search size={16} color="var(--text-tertiary)" />
+                        <input
+                            type="text"
+                            placeholder="Search..."
+                            className="input-reset"
+                            style={{ marginLeft: '8px', fontSize: '0.85rem', width: '100%' }}
+                            value={searchTerm}
+                            onChange={handleSearch}
+                        />
+                    </div>
+                ) : (
+                    <div style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
+                        {/* Centered search icon when collapsed? Or just the toggle. Lets keep toggle consistent. */}
+                        {/* Actually toggle is better separate. */}
+                    </div>
+                )}
+
+                {/* Toggle Button */}
+                <button
+                    className="btn-reset"
+                    onClick={() => setIsCollapsed(!isCollapsed)}
+                    style={{
+                        padding: '8px',
+                        borderRadius: '8px',
+                        color: 'var(--text-secondary)',
+                        backgroundColor: isCollapsed ? 'transparent' : 'var(--bg-secondary)', // Subtle
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginLeft: isCollapsed ? 'auto' : '0', // Center if collapsed
+                        width: isCollapsed ? '100%' : 'auto'
+                    }}
+                >
+                    {isCollapsed ? <ChevronRight size={20} /> : <ChevronLeft size={18} />}
+                </button>
             </div>
 
-            {/* App List (New Chat) */}
-            <div style={{ padding: '0 16px 24px' }}>
-                <div style={{
-                    fontSize: '0.75rem',
-                    color: 'var(--text-secondary)',
-                    fontWeight: 600,
-                    marginBottom: '8px',
-                    textTransform: 'uppercase'
-                }}>
-                    New Chat
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {APPS.map(app => (
-                        <button
-                            key={app.id}
-                            className="btn-ghost"
-                            onClick={() => onNewChat(app.id)}
-                            style={{
-                                justifyContent: 'flex-start',
-                                width: '100%',
-                                textAlign: 'left',
-                                padding: '8px 12px'
-                            }}
-                        >
-                            <div style={{ marginRight: '10px' }}>
-                                <Plus size={16} />
-                            </div>
-                            <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {app.title}
-                            </div>
-                        </button>
-                    ))}
-                </div>
-            </div>
-
-            {/* History List */}
+            {/* Scrollable Area */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '0 16px' }}>
-                <div style={{
-                    fontSize: '0.75rem',
-                    color: 'var(--text-secondary)',
-                    fontWeight: 600,
-                    marginBottom: '8px',
-                    textTransform: 'uppercase'
-                }}>
-                    History
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    {conversations.map(item => {
-                        const isSelected = item.id === currentConversationId;
-                        return (
+
+                {/* Section 1: Specialized Apps */}
+                <div style={{ marginBottom: '32px', textAlign: isCollapsed ? 'center' : 'left' }}>
+                    {!isCollapsed && <div className="nav-header">Specialized Apps</div>}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: isCollapsed ? 'center' : 'stretch' }}>
+                        {APPS.map(app => (
                             <button
-                                key={item.id}
-                                className={isSelected ? 'btn-primary' : 'btn-ghost'}
-                                onClick={() => onSelectConversation(item.id)}
+                                key={app.id}
+                                className="btn-reset"
+                                onClick={() => onNewChat(app.id)}
+                                title={isCollapsed ? app.title : ''}
                                 style={{
-                                    justifyContent: 'flex-start',
-                                    width: '100%',
-                                    padding: '10px 12px',
-                                    height: 'auto',
-                                    backgroundColor: isSelected ? 'var(--bg-tertiary)' : undefined, // Visual tweaks for active state if not using primary color
-                                    color: isSelected ? 'var(--text-primary)' : undefined,
-                                    border: isSelected ? '1px solid var(--border-subtle)' : '1px solid transparent'
+                                    display: 'flex',
+                                    alignItems: 'center', // Changed for collapse
+                                    justifyContent: isCollapsed ? 'center' : 'flex-start',
+                                    gap: '12px',
+                                    padding: '8px 12px',
+                                    borderRadius: 'var(--radius-md)',
+                                    transition: 'background 0.2s',
                                 }}
                             >
-                                <div style={{ display: 'flex', width: '100%', gap: '10px' }}>
-                                    <MessageSquare size={16} style={{ minWidth: '16px', marginTop: '3px', color: 'var(--text-secondary)' }} />
-                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '2px', overflow: 'hidden', flex: 1 }}>
-                                        <span style={{ fontSize: '0.9rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', textAlign: 'left', fontWeight: isSelected ? 600 : 400 }}>
-                                            {item.title}
-                                        </span>
-                                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                                            {formatTime(item.updatedAt)}
-                                        </span>
-                                    </div>
+                                <div style={{
+                                    width: '32px', height: '32px',
+                                    borderRadius: '8px',
+                                    backgroundColor: '#fff',
+                                    border: '1px solid var(--border-subtle)',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    flexShrink: 0
+                                }}>
+                                    <span style={{ fontWeight: 700, fontSize: '14px' }}>{app.title[0]}</span>
                                 </div>
+                                {!isCollapsed && (
+                                    <div>
+                                        <div className="nav-item-title">{app.title}</div>
+                                    </div>
+                                )}
                             </button>
-                        );
-                    })}
+                        ))}
+                    </div>
                 </div>
+
+                {/* Section 2: Recent Chats */}
+                <div style={{ textAlign: isCollapsed ? 'center' : 'left' }}>
+                    {!isCollapsed && (
+                        <div className="nav-header" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span>Recent Chats</span>
+                            <span style={{ backgroundColor: '#e0e0e0', borderRadius: '4px', padding: '1px 6px', color: '#666', fontSize: '0.65rem' }}>{filteredConversations.length}</span>
+                        </div>
+                    )}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: isCollapsed ? 'center' : 'stretch' }}>
+                        {filteredConversations.map(item => {
+                            const isSelected = item.id === currentConversationId;
+                            return (
+                                <button
+                                    key={item.id}
+                                    className="btn-reset"
+                                    onClick={() => onSelectConversation(item.id)}
+                                    title={isCollapsed ? item.title : ''}
+                                    style={{
+                                        padding: '12px',
+                                        borderRadius: 'var(--radius-md)',
+                                        backgroundColor: isSelected ? '#fff' : 'transparent',
+                                        boxShadow: isSelected ? 'var(--shadow-card)' : 'none',
+                                        transition: 'all 0.2s',
+                                        width: isCollapsed ? '40px' : 'auto',
+                                        height: isCollapsed ? '40px' : 'auto',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: isCollapsed ? 'center' : 'flex-start'
+                                    }}
+                                >
+                                    {!isCollapsed ? (
+                                        <div className="nav-item-title" style={{ fontSize: '0.8rem', marginBottom: '0', color: isSelected ? 'var(--accent-primary)' : 'var(--text-secondary)', textAlign: 'left', width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            {item.title}
+                                        </div>
+                                    ) : (
+                                        <MessageSquare size={16} color={isSelected ? 'var(--accent-primary)' : 'var(--text-tertiary)'} />
+                                    )}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+
+
+
             </div>
         </aside>
     );

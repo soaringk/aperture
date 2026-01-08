@@ -1,5 +1,5 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
-import type { Conversation, Message } from './types'; // Note .js extension for raw ES modules if needed, but in Vite TS it's fine without or with .js if moduleResolution is set. sticking to no extension or .ts depending on user config. Standard Vite handles imports without extension usually. Removing .js for safety in TS source.
+import type { Conversation, Message } from '@/core/types';
 import { v4 as uuidv4 } from 'uuid';
 
 interface AppDB extends DBSchema {
@@ -86,7 +86,7 @@ class DBService {
 
     async addMessage(conversationId: string, message: Omit<Message, 'conversationId' | 'id'>): Promise<Message> {
         const db = await this.dbPromise;
-        const fullMessage: Message & { conversationId: string } = {
+        const fullMessage: Message = {
             ...message,
             id: uuidv4(),
             conversationId,
@@ -131,7 +131,7 @@ class DBService {
             const snippet = (snippetStart > 0 ? '...' : '') + m.content.substring(snippetStart, snippetEnd) + (snippetEnd < m.content.length ? '...' : '');
 
             return {
-                conversationId: (m as any).conversationId, // Type assertion since Message type in types.ts doesn't show conversationId but our DB type does.
+                conversationId: m.conversationId,
                 messageId: m.id,
                 content: m.content,
                 snippet

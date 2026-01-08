@@ -1,7 +1,7 @@
 import React from 'react';
-import { Sidebar } from './Sidebar';
-import { ChatArea } from './ChatArea';
-import { useAppLogic } from '../hooks/useAppLogic';
+import { Sidebar } from '@/components/Sidebar';
+import { ChatArea } from '@/components/ChatArea';
+import { useAppLogic } from '@/hooks/useAppLogic';
 import '../index.css';
 
 export const Layout: React.FC = () => {
@@ -12,9 +12,11 @@ export const Layout: React.FC = () => {
         currentConversationId,
         isLoading,
         streamingContent,
+        error,
         startNewChat,
         sendMessage,
-        setCurrentConversationId
+        setCurrentConversationId,
+        clearError
     } = useAppLogic();
 
     return (
@@ -24,7 +26,6 @@ export const Layout: React.FC = () => {
                 currentConversationId={currentConversationId}
                 onNewChat={startNewChat}
                 onSelectConversation={setCurrentConversationId}
-                onSearch={(q: string) => { console.log('Search not impl in DB yet', q) }}
             />
             <main style={{ flex: 1, position: 'relative', display: 'flex', flexDirection: 'column' }}>
                 <ChatArea
@@ -32,7 +33,10 @@ export const Layout: React.FC = () => {
                     messages={messages}
                     isLoading={isLoading}
                     streamingContent={streamingContent}
+                    error={error}
                     onSendMessage={sendMessage}
+                    onClearError={clearError}
+                    onSelectApp={startNewChat}
                 />
             </main>
         </div>
