@@ -26,8 +26,8 @@ class LLMService implements LLMStrategy {
         });
 
         if (!response.ok) {
-            const error = await response.text();
-            throw new Error(error || 'Request failed');
+            const errorText = await response.text();
+            throw new Error(errorText || `Request failed with status ${response.status}`);
         }
 
         if (!response.body) throw new Error('ReadableStream not supported');
@@ -35,13 +35,31 @@ class LLMService implements LLMStrategy {
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let fullText = '';
+        let buffer = '';
 
         while (true) {
             const { done, value } = await reader.read();
             if (done) break;
-            const chunk = decoder.decode(value, { stream: true });
-            fullText += chunk;
-            if (onStream) onStream(chunk);
+
+            buffer += decoder.decode(value, { stream: true });
+
+            // SSE blocks are separated by double newlines
+            let boundary = buffer.indexOf('\n\n');
+            while (boundary !== -1) {
+                const block = buffer.slice(0, boundary).trim();
+                buffer = buffer.slice(boundary + 2);
+
+                if (block.startsWith('data: ')) {
+                    const content = block.slice(6);
+                    fullText += content;
+                    if (onStream) onStream(content);
+                } else if (block.startsWith('error: ')) {
+                    const error = block.slice(7);
+                    throw new Error(error);
+                }
+
+                boundary = buffer.indexOf('\n\n');
+            }
         }
 
         return fullText;

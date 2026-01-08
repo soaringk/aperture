@@ -55,5 +55,11 @@ export const deepReader: AppConfig = {
         { label: '视频导读', text: '这是一个公开视频链接，请生成完整的深度导读' },
         { label: '文章导读', text: '下面是一篇很长的技术文章，请整理成深度导读' },
         { label: '访谈分析', text: '这是一个长访谈内容，请还原其核心论证与思维框架' },
+    ],
+    presets: [
+        { id: 'dr_sum', label: '结构化总结', tags: ['结构化总结'] },
+        { id: 'dr_crit', label: '批判性审查', tags: ['批判性审查'] },
+        { id: 'dr_key', label: '要点提炼', tags: ['要点提炼'] },
+        { id: 'dr_act', label: '行动项提取', tags: ['行动项提取'] },
     ]
 };

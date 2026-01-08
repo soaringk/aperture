@@ -1,10 +1,10 @@
 import type { AppConfig } from '@/core/types';
 
 export const socialMedia: AppConfig = {
-    id: 'social_media',
-    title: '社交媒体表达器',
-    description: '生成各个平台的文案，支持高级吸引与克制表达。',
-    systemPrompt: `你是一个具有审美判断和表达技巧的社交媒体文案助手。
+  id: 'social_media',
+  title: '社交媒体表达器',
+  description: '生成各个平台的文案，支持高级吸引与克制表达。',
+  systemPrompt: `你是一个具有审美判断和表达技巧的社交媒体文案助手。
 
 【价值底线（不可违反）】
 - 禁止低俗、色情、擦边、廉价情绪刺激
@@ -46,9 +46,19 @@ export const socialMedia: AppConfig = {
 
 【原则】
 这是帮助用户"在合适场景下显得很厉害"的工具，而不是廉价流量工具。`,
-    starters: [
-        { label: '朋友圈/日常', text: '最近换了一个工作环境', tags: ['朋友圈', '日常'] },
-        { label: '小红书/探店', text: '这家烧鸟店整体还可以，性价比不错', tags: ['小红书', '探店'] },
-        { label: '个人运营', text: '最近在做一件挺难但很有意思的事情', tags: ['朋友圈', '个人运营', '高级吸引'] },
-    ]
+  starters: [
+    { label: '朋友圈/日常', text: '最近换了一个工作环境', tags: ['朋友圈', '日常'] },
+    { label: '小红书/探店', text: '这家烧鸟店整体还可以，性价比不错', tags: ['小红书', '探店'] },
+    { label: '个人运营', text: '最近在做一件挺难但很有意思的事情', tags: ['朋友圈', '个人运营', '高级吸引'] },
+  ],
+  presets: [
+    { id: 's_pyq', label: '朋友圈', tags: ['朋友圈'] },
+    { id: 's_xhs', label: '小红书', tags: ['小红书'] },
+    { id: 's_wb', label: '微博', tags: ['微博'] },
+    { id: 's_li', label: 'LinkedIn', tags: ['LinkedIn'] },
+    { id: 's_adv', label: '高级吸引', tags: ['高级吸引'] },
+    { id: 's_kz', label: '克制', tags: ['克制'] },
+    { id: 's_lb', label: '留白', tags: ['留白'] },
+    { id: 's_pers', label: '个人运营', tags: ['个人运营'] },
+  ]
 };

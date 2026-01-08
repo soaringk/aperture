@@ -108,13 +108,24 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     const [showInputContextSelector, setShowInputContextSelector] = useState(false);
     const [contextSearch, setContextSearch] = useState('');
     const [isTransitioning, setIsTransitioning] = useState(false);
+
+    // Local state to hold the "active" data being displayed.
+    // This allows us to freeze the UI during a transition while props change in the background.
+    const [activeApp, setActiveApp] = useState<AppConfig | null>(currentApp);
+    const [activeMessages, setActiveMessages] = useState<Message[]>(messages);
+    const prevAppIdRef = useRef<string | undefined>(currentApp?.id);
+
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const filteredContexts = PRESET_CONTEXTS.filter(c =>
-        c.label.toLowerCase().includes(contextSearch.toLowerCase()) ||
-        c.tags.some(t => t.toLowerCase().includes(contextSearch.toLowerCase()))
-    );
+    const filteredContexts = useMemo(() => {
+        // Use app-specific presets if available, otherwise global defaults
+        const sourceContexts = activeApp?.presets || PRESET_CONTEXTS;
+        return sourceContexts.filter(c =>
+            c.label.toLowerCase().includes(contextSearch.toLowerCase()) ||
+            c.tags.some(t => t.toLowerCase().includes(contextSearch.toLowerCase()))
+        );
+    }, [activeApp?.id, activeApp?.presets, contextSearch]);
 
     const handleAddContext = (ctx: PresetContext) => {
         const newTags = [...new Set([...tags, ...ctx.tags])];
@@ -153,35 +164,48 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
     useEffect(() => {
         scrollToBottom();
-    }, [messages, streamingContent]);
+    }, [activeMessages, streamingContent]);
 
-    // Refined transition logic for silky smooth app switching
+    // Sync messages if we are on the same app
     useEffect(() => {
-        let isCancelled = false;
+        if (currentApp?.id === activeApp?.id) {
+            setActiveMessages(messages);
+        }
+    }, [messages, currentApp?.id, activeApp?.id]);
 
-        // Start transition out
+    // Silky smooth transition logic:
+    // When currentApp.id changes, we fade out, swap the local state, then fade in.
+    useEffect(() => {
+        if (currentApp?.id === prevAppIdRef.current) return;
+
+        let isCancelled = false;
         setIsTransitioning(true);
 
+        // 1. Wait for fade-out to complete (matches transition duration)
         const transitionTimeout = setTimeout(() => {
             if (isCancelled) return;
 
-            // Clear states midway through the transition when hidden
+            // 2. Mid-transition swap (hidden from user)
+            setActiveApp(currentApp);
+            setActiveMessages(messages);
             setTags([]);
             setInput('');
             setAttachments([]);
+            setContextSearch('');
+            prevAppIdRef.current = currentApp?.id;
 
-            // Allow time for state updates to settle before fading back in
+            // 3. Brief pause to ensure DOM has updated before fading back in
             setTimeout(() => {
                 if (isCancelled) return;
                 setIsTransitioning(false);
             }, 50);
-        }, 150);
+        }, 200);
 
         return () => {
             isCancelled = true;
             clearTimeout(transitionTimeout);
         };
-    }, [currentApp?.id]);
+    }, [currentApp?.id, messages]);
 
     const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = e.target.files;
@@ -229,8 +253,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             flexDirection: 'column',
             height: '100%',
             opacity: isTransitioning ? 0 : 1,
-            transform: isTransitioning ? 'translateY(8px) scale(0.995)' : 'translateY(0) scale(1)',
-            transition: 'opacity 0.2s ease-in-out, transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+            transition: 'opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
             padding: '24px',
             position: 'relative'
         }}>
@@ -347,7 +370,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
             {/* Messages Area */}
             <div style={{ flex: 1, overflowY: 'auto', marginBottom: '24px', paddingRight: '12px', scrollBehavior: 'smooth' }}>
-                {!currentApp && messages.length === 0 && (
+                {!activeApp && activeMessages.length === 0 && (
                     <div style={{
                         display: 'flex',
                         flexDirection: 'column',
@@ -421,10 +444,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                     </div>
                 )}
 
-                {currentApp && messages.length === 0 && (
+                {activeApp && activeMessages.length === 0 && (
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '80px', gap: '24px' }}>
                         <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', justifyContent: 'center' }}>
-                            {currentApp.starters.map((s, idx) => (
+                            {activeApp.starters.map((s, idx) => (
                                 <button
                                     key={s.label}
                                     onClick={() => handleStarter(s.text, s.tags)}
@@ -459,10 +482,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                     </div>
                 )}
 
-                {messages.map((m, idx) => {
+                {activeMessages.map((m, idx) => {
                     const isLastUserMessage = m.role === 'user' && (
-                        idx === messages.length - 1 ||
-                        (idx === messages.length - 2 && messages[messages.length - 1]?.role === 'assistant')
+                        idx === activeMessages.length - 1 ||
+                        (idx === activeMessages.length - 2 && activeMessages[activeMessages.length - 1]?.role === 'assistant')
                     );
 
                     return (

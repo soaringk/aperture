@@ -6,10 +6,6 @@ export interface PresetContext {
 }
 
 export const PRESET_CONTEXTS: PresetContext[] = [
-    // Languages
-    { id: 'lang_en', label: '英文', tags: ['英文'] },
-    { id: 'lang_zh', label: '中文', tags: ['中文'] },
-
     // Scenes
     { id: 'scene_daily', label: '日常闲聊', tags: ['日常闲聊'] },
     { id: 'scene_work', label: '工作沟通', tags: ['工作沟通'] },

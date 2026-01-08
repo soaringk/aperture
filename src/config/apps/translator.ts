@@ -31,5 +31,15 @@ export const translator: AppConfig = {
         { label: '俄语/机场', text: '我们的登机口在哪里？', tags: ['俄语', '机场'] },
         { label: '日语/餐厅', text: '我对花生过敏', tags: ['日语', '餐厅'] },
         { label: 'IT', text: '这个实现方案的复杂度明显过高', tags: ['技术探讨'] },
+    ],
+    presets: [
+        { id: 't_ja', label: '日语', tags: ['日语'] },
+        { id: 't_ru', label: '俄语', tags: ['俄语'] },
+        { id: 't_fr', label: '法语', tags: ['法语'] },
+        { id: 't_ko', label: '韩语', tags: ['韩语'] },
+        { id: 't_air', label: '机场', tags: ['机场'] },
+        { id: 't_rest', label: '餐厅', tags: ['餐厅'] },
+        { id: 't_cr', label: 'Code Review', tags: ['Code Review'] },
+        { id: 't_meet', label: '会议', tags: ['会议'] },
     ]
 };

@@ -33,5 +33,11 @@ export const wordingAdvisor: AppConfig = {
         { label: '同事/拒绝', text: '对方说：这个需求你今晚能不能帮我改一下？', tags: ['同事', '拒绝'] },
         { label: '上级/确认', text: '他问我这个方案是不是已经最终确定', tags: ['上级', '确认'] },
         { label: '通用求助', text: '我不知道该怎么回这条消息，你帮我想一下' },
+    ],
+    presets: [
+        { id: 'w_de', label: '得体优雅', tags: ['得体优雅'] },
+        { id: 'w_zc', label: '真诚恳切', tags: ['真诚恳切'] },
+        { id: 'w_gs', label: '公式严谨', tags: ['公式严谨'] },
+        { id: 'w_wj', label: '委婉拒绝', tags: ['委婉拒绝'] },
     ]
 };

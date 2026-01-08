@@ -25,12 +25,15 @@ export interface Conversation {
     tags?: string[]; // Global tags for the session
 }
 
+import type { PresetContext } from '@/config/contexts';
+
 export interface AppConfig {
     id: string;
     title: string;
     description: string;
     systemPrompt: string;
     starters: Starter[];
+    presets?: PresetContext[];
 }
 
 export interface Starter {
