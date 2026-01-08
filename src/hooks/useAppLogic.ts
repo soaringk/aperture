@@ -106,15 +106,17 @@ export function useAppLogic() {
                 attachments
             );
 
-            // 4. Save Assistant Message
-            const assistantMsg: Omit<Message, 'conversationId' | 'id'> = {
-                role: 'assistant',
-                content: assistantResponseText,
-                createdAt: Date.now()
-            };
+            // 4. Save Assistant Message (only if content is not empty)
+            if (assistantResponseText.trim()) {
+                const assistantMsg: Omit<Message, 'conversationId' | 'id'> = {
+                    role: 'assistant',
+                    content: assistantResponseText,
+                    createdAt: Date.now()
+                };
 
-            const savedAssistantMsg = await db.addMessage(convId, assistantMsg);
-            setMessages(prev => [...prev, savedAssistantMsg]);
+                const savedAssistantMsg = await db.addMessage(convId, assistantMsg);
+                setMessages(prev => [...prev, savedAssistantMsg]);
+            }
 
             // Update title if it's the first exchange
             if (messages.length === 0) {
