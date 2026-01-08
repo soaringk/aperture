@@ -114,6 +114,11 @@ class DBService {
         return db.getAllFromIndex('messages', 'by-conversation', conversationId);
     }
 
+    async deleteMessage(messageId: string): Promise<void> {
+        const db = await this.dbPromise;
+        await db.delete('messages', messageId);
+    }
+
     async searchHistory(query: string): Promise<{ conversationId: string, messageId: string, content: string, snippet: string }[]> {
         const db = await this.dbPromise;
         // Simple full scan implementation for now.

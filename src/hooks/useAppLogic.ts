@@ -135,6 +135,78 @@ export function useAppLogic() {
         }
     };
 
+    // Rerun last user message - delete last assistant response and resend
+    const rerunMessage = async () => {
+        if (isLoading || !currentConversationId || !currentApp || messages.length === 0) return;
+
+        // Find last user message
+        let lastUserMsgIndex = -1;
+        for (let i = messages.length - 1; i >= 0; i--) {
+            if (messages[i].role === 'user') {
+                lastUserMsgIndex = i;
+                break;
+            }
+        }
+        if (lastUserMsgIndex === -1) return;
+
+        const lastUserMsg = messages[lastUserMsgIndex];
+
+        // Delete all messages after the last user message (assistant responses)
+        const messagesAfterUser = messages.slice(lastUserMsgIndex + 1);
+        for (const msg of messagesAfterUser) {
+            await db.deleteMessage(msg.id);
+        }
+
+        // Update local state to remove assistant messages
+        setMessages(messages.slice(0, lastUserMsgIndex + 1));
+
+        // Prepare for LLM
+        setIsLoading(true);
+        setStreamingContent('');
+        setError(null);
+
+        try {
+            let finalPrompt = lastUserMsg.content;
+            if (lastUserMsg.tags && lastUserMsg.tags.length > 0) {
+                const xmlTags = generateXmlTags(lastUserMsg.tags);
+                finalPrompt = `${xmlTags}\n${lastUserMsg.content}`;
+            }
+
+            // Get messages before the last user message for context
+            const historyMessages = messages.slice(0, lastUserMsgIndex);
+
+            const assistantResponseText = await llm.chat(
+                historyMessages,
+                finalPrompt,
+                currentApp.systemPrompt,
+                (chunk: string) => {
+                    setStreamingContent(prev => prev + chunk);
+                },
+                lastUserMsg.attachments || []
+            );
+
+            // Save new assistant message (only if not empty)
+            if (assistantResponseText.trim()) {
+                const assistantMsg: Omit<Message, 'conversationId' | 'id'> = {
+                    role: 'assistant',
+                    content: assistantResponseText,
+                    createdAt: Date.now()
+                };
+
+                const savedAssistantMsg = await db.addMessage(currentConversationId, assistantMsg);
+                setMessages(prev => [...prev, savedAssistantMsg]);
+            }
+
+        } catch (e: unknown) {
+            const err = e as Error;
+            logger.error('LLM rerun failed', err);
+            setError(err.message || 'Rerun failed');
+        } finally {
+            setIsLoading(false);
+            setStreamingContent('');
+        }
+    };
+
     const clearError = () => setError(null);
 
     return {
@@ -149,6 +221,7 @@ export function useAppLogic() {
         startNewChat,
         loadHistory,
         sendMessage,
+        rerunMessage,
         setCurrentConversationId,
         clearError
     };

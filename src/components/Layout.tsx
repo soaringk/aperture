@@ -15,6 +15,7 @@ export const Layout: React.FC = () => {
         error,
         startNewChat,
         sendMessage,
+        rerunMessage,
         setCurrentConversationId,
         clearError
     } = useAppLogic();
@@ -35,6 +36,7 @@ export const Layout: React.FC = () => {
                     streamingContent={streamingContent}
                     error={error}
                     onSendMessage={sendMessage}
+                    onRerunMessage={rerunMessage}
                     onClearError={clearError}
                     onSelectApp={startNewChat}
                 />

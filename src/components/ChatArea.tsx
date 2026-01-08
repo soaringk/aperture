@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { ArrowUp, Plus, Paperclip, X, Sparkles, Command, FileText } from 'lucide-react';
+import { ArrowUp, Plus, Paperclip, X, Sparkles, Command, FileText, RefreshCw } from 'lucide-react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import type { AppConfig, Message, Attachment } from '@/core/types';
@@ -14,6 +14,7 @@ interface ChatAreaProps {
     streamingContent: string;
     error: string | null;
     onSendMessage: (text: string, tags: string[], attachments: Attachment[]) => void;
+    onRerunMessage: () => void;
     onClearError: () => void;
     onSelectApp: (appId: string) => void;
 }
@@ -89,6 +90,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     streamingContent,
     error,
     onSendMessage,
+    onRerunMessage,
     onClearError,
     onSelectApp
 }) => {
@@ -400,47 +402,82 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                     </div>
                 )}
 
-                {messages.map((m, idx) => (
-                    <div key={m.id} style={{
-                        display: 'flex',
-                        marginBottom: '32px',
-                        justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start',
-                        animation: `fadeIn 0.4s ease-out ${idx === messages.length - 1 ? '0s' : '0s'}`
-                    }}>
-                        <div style={{
-                            maxWidth: m.role === 'user' ? '70%' : '90%',
-                            padding: m.role === 'user' ? '12px 20px' : '24px',
-                            borderRadius: m.role === 'user' ? '20px 20px 4px 20px' : 'var(--radius-md)',
-                            backgroundColor: m.role === 'user' ? 'var(--accent-primary)' : 'var(--bg-secondary)',
-                            color: m.role === 'user' ? 'white' : 'var(--text-primary)',
-                            boxShadow: m.role === 'user' ? '0 4px 12px rgba(0,0,0,0.1)' : 'var(--shadow-card)',
-                            border: m.role === 'user' ? 'none' : '1px solid var(--border-subtle)',
-                            position: 'relative'
+                {messages.map((m, idx) => {
+                    // Show rerun button on the last user message (either the very last message, or second-to-last if last is assistant)
+                    const isLastUserMessage = m.role === 'user' && (
+                        idx === messages.length - 1 ||
+                        (idx === messages.length - 2 && messages[messages.length - 1]?.role === 'assistant')
+                    );
+
+                    return (
+                        <div key={m.id} style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: m.role === 'user' ? 'flex-end' : 'flex-start',
+                            marginBottom: '32px',
+                            animation: `fadeIn 0.4s ease-out`
                         }}>
-                            {m.attachments && m.attachments.length > 0 && (
-                                <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
-                                    {m.attachments.map((a, i) => (
-                                        <div key={i} style={{ borderRadius: '8px', overflow: 'hidden', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(0,0,0,0.05)' }}>
-                                            {a.mimeType.startsWith('image/') ? (
-                                                <img src={a.data} alt={a.name} style={{ maxWidth: '200px', maxHeight: '200px', display: 'block' }} />
-                                            ) : (
-                                                <div style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem' }}>
-                                                    <FileText size={16} />
-                                                    <span>{a.name}</span>
-                                                </div>
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                            {m.role === 'user' ? (
-                                <div style={{ fontSize: '0.95rem', whiteSpace: 'pre-wrap' }}>{m.content}</div>
-                            ) : (
-                                <div className="markdown-content" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked.parse(m.content) as string) }} />
+                            <div style={{
+                                maxWidth: m.role === 'user' ? '70%' : '90%',
+                                padding: m.role === 'user' ? '12px 20px' : '24px',
+                                borderRadius: m.role === 'user' ? '20px 20px 4px 20px' : 'var(--radius-md)',
+                                backgroundColor: m.role === 'user' ? 'var(--accent-primary)' : 'var(--bg-secondary)',
+                                color: m.role === 'user' ? 'white' : 'var(--text-primary)',
+                                boxShadow: m.role === 'user' ? '0 4px 12px rgba(0,0,0,0.1)' : 'var(--shadow-card)',
+                                border: m.role === 'user' ? 'none' : '1px solid var(--border-subtle)'
+                            }}>
+                                {m.attachments && m.attachments.length > 0 && (
+                                    <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
+                                        {m.attachments.map((a, i) => (
+                                            <div key={i} style={{ borderRadius: '8px', overflow: 'hidden', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(0,0,0,0.05)' }}>
+                                                {a.mimeType.startsWith('image/') ? (
+                                                    <img src={a.data} alt={a.name} style={{ maxWidth: '200px', maxHeight: '200px', display: 'block' }} />
+                                                ) : (
+                                                    <div style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem' }}>
+                                                        <FileText size={16} />
+                                                        <span>{a.name}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                                {m.role === 'user' ? (
+                                    <div style={{ fontSize: '0.95rem', whiteSpace: 'pre-wrap' }}>{m.content}</div>
+                                ) : (
+                                    <div className="markdown-content" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked.parse(m.content) as string) }} />
+                                )}
+                            </div>
+                            {/* Rerun button - show below last user message */}
+                            {isLastUserMessage && (
+                                <button
+                                    className="btn-reset"
+                                    onClick={onRerunMessage}
+                                    disabled={isLoading}
+                                    title="Rerun"
+                                    style={{
+                                        marginTop: '8px',
+                                        padding: '4px 8px',
+                                        borderRadius: '6px',
+                                        color: 'var(--text-tertiary)',
+                                        opacity: isLoading ? 0.3 : 0.6,
+                                        transition: 'opacity 0.2s',
+                                        cursor: isLoading ? 'not-allowed' : 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        fontSize: '0.75rem'
+                                    }}
+                                    onMouseEnter={e => { if (!isLoading) e.currentTarget.style.opacity = '1'; }}
+                                    onMouseLeave={e => e.currentTarget.style.opacity = '0.6'}
+                                >
+                                    <RefreshCw size={12} />
+                                    <span>Rerun</span>
+                                </button>
                             )}
                         </div>
-                    </div>
-                ))}
+                    );
+                })}
 
                 {streamingContent && (
                     <div style={{ display: 'flex', marginBottom: '32px', justifyContent: 'flex-start' }}>
