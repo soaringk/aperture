@@ -8,17 +8,19 @@ interface SidebarProps {
     currentConversationId: string | null;
     onNewChat: (appId: string) => void;
     onSelectConversation: (id: string) => void;
+    isCollapsed: boolean;
+    onToggle: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
     conversations,
     currentConversationId,
     onNewChat,
-    onSelectConversation
+    onSelectConversation,
+    isCollapsed,
+    onToggle
 }) => {
     const [searchTerm, setSearchTerm] = useState('');
-
-    const [isCollapsed, setIsCollapsed] = useState(false);
 
     const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
         const val = e.target.value;
@@ -41,7 +43,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
             overflow: 'hidden',
             transition: 'width 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
             zIndex: 50,
-            background: 'rgba(255, 255, 255, 0.4)' // Extra subtle for sidebar
+            background: 'rgba(255, 255, 255, 0.4)', // Extra subtle for sidebar
+            flexShrink: 0
         }}>
             {/* Top Bar: Search + Collapse Toggle */}
             <div style={{
@@ -82,7 +85,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 {/* Toggle Button */}
                 <button
                     className="btn-reset"
-                    onClick={() => setIsCollapsed(!isCollapsed)}
+                    onClick={onToggle}
                     style={{
                         padding: '8px',
                         borderRadius: '8px',
@@ -148,7 +151,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                     <span style={{ fontWeight: 700, fontSize: '15px' }}>{app.title[0]}</span>
                                 </div>
                                 {!isCollapsed && (
-                                    <div style={{ fontWeight: 500, color: 'var(--text-primary)', fontSize: '0.95rem' }}>
+                                    <div style={{ fontWeight: 500, color: 'var(--text-primary)', fontSize: '0.95rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                         {app.title}
                                     </div>
                                 )}

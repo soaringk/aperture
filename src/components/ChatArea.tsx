@@ -173,6 +173,12 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         }
     }, [messages, currentApp?.id, activeApp?.id]);
 
+    // Close context menus when switching apps
+    useEffect(() => {
+        setShowContextSelector(false);
+        setShowInputContextSelector(false);
+    }, [currentApp?.id]);
+
     // Silky smooth transition logic:
     // When currentApp.id changes, we fade out, swap the local state, then fade in.
     useEffect(() => {
@@ -287,11 +293,28 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                     }}>
                         <Sparkles size={20} strokeWidth={1.5} style={{ opacity: 0.8 }} />
                     </div>
-                    <div>
-                        <h2 style={{ fontSize: '1rem', fontWeight: 600, margin: 0, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
+                    <div style={{ minWidth: 0 }}>
+                        <h2 style={{
+                            fontSize: '1rem',
+                            fontWeight: 600,
+                            margin: 0,
+                            color: 'var(--text-primary)',
+                            letterSpacing: '-0.01em',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis'
+                        }}>
                             {currentApp?.title || 'Welcome'}
                         </h2>
-                        <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0, fontWeight: 400 }}>
+                        <p style={{
+                            fontSize: '0.8rem',
+                            color: 'var(--text-secondary)',
+                            margin: 0,
+                            fontWeight: 400,
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis'
+                        }}>
                             {currentApp?.description || 'Select a tool to begin'}
                         </p>
                     </div>

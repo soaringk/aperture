@@ -22,7 +22,7 @@ class LLMService implements LLMStrategy {
         const response = await fetch(`${API_BASE_URL}/api/chat`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ messages, systemPrompt }),
+            body: JSON.stringify({ messages, systemPrompt, stream: true }),
         });
 
         if (!response.ok) {

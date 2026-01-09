@@ -20,15 +20,34 @@ export const Layout: React.FC = () => {
         clearError
     } = useAppLogic();
 
+    const [isCollapsed, setIsCollapsed] = React.useState(false);
+
     return (
-        <div style={{ display: 'flex', width: '100%', height: '100%' }}>
+        <div style={{ display: 'flex', width: '100vw', height: '100vh', overflow: 'hidden' }}>
             <Sidebar
                 conversations={conversations}
                 currentConversationId={currentConversationId}
                 onNewChat={startNewChat}
                 onSelectConversation={setCurrentConversationId}
+                isCollapsed={isCollapsed}
+                onToggle={() => setIsCollapsed(!isCollapsed)}
             />
-            <main style={{ flex: 1, position: 'relative', display: 'flex', flexDirection: 'column' }}>
+            {/* Main Content Area - Drawer Effect */}
+            <main style={{
+                // Fixed width: full viewport minus the *collapsed* sidebar width (80px).
+                // This ensures the content is always the "correct" wide width.
+                // When sidebar expands (to 280px), it pushes this fixed-width block
+                // to the right, causing the right side to overflow off-screen.
+                width: 'calc(100vw - 80px)',
+                minWidth: 'calc(100vw - 80px)',
+                flexShrink: 0,
+                position: 'relative',
+                display: 'flex',
+                flexDirection: 'column',
+                transition: 'transform 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
+                // Optional: visual separator
+                borderLeft: '1px solid var(--border-subtle)'
+            }}>
                 <ChatArea
                     currentApp={currentApp}
                     messages={messages}

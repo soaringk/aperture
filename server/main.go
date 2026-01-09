@@ -3,13 +3,14 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/joho/godotenv"
 	"github.com/rs/cors"
 	"github.com/soaringk/aperture/server/pkg/ai/sdk"
 	"github.com/soaringk/aperture/server/pkg/logger"
+	"go.jetify.com/sse"
 	"go.uber.org/zap"
 )
 
@@ -79,58 +80,231 @@ func handleChat(w http.ResponseWriter, r *http.Request) {
 	log.Debug("Processing chat request",
 		zap.String("provider", cfg.LLM.Provider),
 		zap.String("model", cfg.LLM.Model),
+		zap.Bool("stream", req.Stream),
 	)
 
-	// We set headers only if we are successful, or let it fall through to http.Error
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
+	// Routing based on stream parameter
+	if req.Stream {
+		handleStreamChat(w, r, req)
+	} else {
+		handleNonStreamChat(w, r, req)
+	}
+}
 
-	// Use pre-initialized provider
-	if err := provider.Stream(w, req); err != nil {
-		log.Error("Stream failed (initial)", zap.Error(err))
+func handleStreamChat(w http.ResponseWriter, r *http.Request, req sdk.ChatRequest) {
+	log := logger.L()
 
-		w.Header().Set("Content-Type", "application/json")
+	// Centralized SSE handling
+	var conn *sse.Conn
+	upgraded := false
 
-		// Map error to status code
-		statusCode := http.StatusInternalServerError
+	// Define yield callback for streaming
+	yield := func(chunk any) error {
+		if !upgraded {
+			// First chunk received: Upgrade connection now
+			var err error
+			conn, err = sse.Upgrade(r.Context(), w)
+			if err != nil {
+				log.Error("Failed to upgrade to SSE", zap.Error(err))
+				return err
+			}
+			upgraded = true
+		}
 
-		var aerr *sdk.APIError
-		if errors.As(err, &aerr) && aerr.StatusCode != 0 {
-			statusCode = aerr.StatusCode
-		} else {
-			// Fallback to heuristic mapping if not a typed APIError
-			errMsg := err.Error()
-			switch {
-			case strings.Contains(errMsg, "429") || strings.Contains(errMsg, "quota") || strings.Contains(errMsg, "resource exhausted"):
-				statusCode = http.StatusTooManyRequests
-			case strings.Contains(errMsg, "401") || strings.Contains(errMsg, "unauthenticated") || strings.Contains(errMsg, "invalid api key") || strings.Contains(errMsg, "API key not valid"):
-				statusCode = http.StatusUnauthorized
-			case strings.Contains(errMsg, "403") || strings.Contains(errMsg, "permission denied"):
-				statusCode = http.StatusForbidden
-			case strings.Contains(errMsg, "400") || strings.Contains(errMsg, "invalid argument"):
-				statusCode = http.StatusBadRequest
+		// Send chunk via SSE
+		return conn.SendEvent(r.Context(), &sse.Event{
+			Data: chunk,
+		})
+	}
+
+	// Call provider
+	err := provider.Chat(r.Context(), req, yield)
+	if err != nil {
+		log.Error("Chat failed", zap.Error(err))
+		if !upgraded {
+			sendJSONError(w, err)
+			return
+		}
+		if conn != nil {
+			_ = conn.SendEvent(r.Context(), &sse.Event{
+				Event: "error",
+				Data:  err.Error(),
+			})
+		}
+		return
+	}
+
+	if upgraded && conn != nil {
+		_ = conn.SendEvent(r.Context(), &sse.Event{
+			Data: "[DONE]",
+		})
+	}
+}
+
+func handleNonStreamChat(w http.ResponseWriter, r *http.Request, req sdk.ChatRequest) {
+	log := logger.L()
+
+	var collectedContent string
+	var collectedReasoningContent string
+	var collectedRole string
+	var finishReason *string
+	var firstChunk *sdk.OpenAIChunk
+	var lastUsage *sdk.Usage
+	var toolCalls []sdk.ToolCall
+	toolCallsMap := make(map[int]*sdk.ToolCall) // Track tool calls by index
+
+	// Define yield callback for accumulation
+	yield := func(chunk any) error {
+		// Check for client disconnect
+		select {
+		case <-r.Context().Done():
+			log.Debug("Non-stream: client disconnected, exiting early")
+			return r.Context().Err()
+		default:
+		}
+
+		c, ok := chunk.(sdk.OpenAIChunk)
+		if !ok {
+			return nil
+		}
+		if firstChunk == nil {
+			firstChunk = &c
+		}
+		// Capture usage from final chunk
+		if c.Usage != nil {
+			lastUsage = c.Usage
+		}
+		if len(c.Choices) > 0 {
+			choice := c.Choices[0]
+			// Accumulate content
+			collectedContent += choice.Delta.Content
+			// Accumulate reasoning content
+			collectedReasoningContent += choice.Delta.ReasoningContent
+			// Capture role
+			if choice.Delta.Role != "" {
+				collectedRole = choice.Delta.Role
+			}
+			// Capture finish_reason (last one wins)
+			if choice.FinishReason != nil {
+				finishReason = choice.FinishReason
+			}
+			// Accumulate tool calls
+			for _, tc := range choice.Delta.ToolCalls {
+				existing, ok := toolCallsMap[tc.Index]
+				if !ok {
+					newTC := sdk.ToolCall{
+						Index: tc.Index,
+						ID:    tc.ID,
+						Type:  tc.Type,
+						Function: sdk.FunctionCall{
+							Name:      tc.Function.Name,
+							Arguments: tc.Function.Arguments,
+						},
+					}
+					toolCallsMap[tc.Index] = &newTC
+				} else {
+					// Accumulate function arguments
+					if tc.ID != "" {
+						existing.ID = tc.ID
+					}
+					if tc.Type != "" {
+						existing.Type = tc.Type
+					}
+					if tc.Function.Name != "" {
+						existing.Function.Name = tc.Function.Name
+					}
+					existing.Function.Arguments += tc.Function.Arguments
+				}
 			}
 		}
-
-		w.WriteHeader(statusCode)
-
-		// Determine 'code' for JSON body (prefer string identifier, fallback to status)
-		var errorCode string
-		if errors.As(err, &aerr) {
-			errorCode = aerr.Code
-		}
-
-		errMsg := err.Error()
-
-		// Send JSON error response matching OpenAI error format
-		jsonError := map[string]interface{}{
-			"error": map[string]interface{}{
-				"message": errMsg,
-				"type":    "server_error",
-				"code":    errorCode,
-			},
-		}
-		json.NewEncoder(w).Encode(jsonError)
+		return nil
 	}
+
+	// Call provider
+	err := provider.Chat(r.Context(), req, yield)
+	if err != nil {
+		log.Error("Chat failed", zap.Error(err))
+		sendJSONError(w, err)
+		return
+	}
+
+	// Convert tool calls map to slice
+	for _, tc := range toolCallsMap {
+		toolCalls = append(toolCalls, *tc)
+	}
+
+	// Handle nil firstChunk
+	if firstChunk == nil {
+		sendJSONError(w, fmt.Errorf("no response from provider"))
+		return
+	}
+
+	// Default finish_reason
+	fr := "stop"
+	if finishReason != nil {
+		fr = *finishReason
+	}
+
+	// Default role
+	if collectedRole == "" {
+		collectedRole = "assistant"
+	}
+
+	// Build message object
+	message := map[string]any{
+		"role":    collectedRole,
+		"content": collectedContent,
+	}
+	if collectedReasoningContent != "" {
+		message["reasoning_content"] = collectedReasoningContent
+	}
+	if len(toolCalls) > 0 {
+		message["tool_calls"] = toolCalls
+	}
+
+	// Construct full response
+	resp := map[string]any{
+		"id":      firstChunk.ID,
+		"object":  "chat.completion",
+		"created": firstChunk.Created,
+		"model":   firstChunk.Model,
+		"choices": []map[string]any{
+			{
+				"index":         0,
+				"message":       message,
+				"finish_reason": fr,
+			},
+		},
+	}
+
+	// Add usage if available
+	if lastUsage != nil {
+		resp["usage"] = lastUsage
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+}
+
+func sendJSONError(w http.ResponseWriter, err error) {
+	w.Header().Set("Content-Type", "application/json")
+
+	statusCode := http.StatusInternalServerError
+	var aerr *sdk.APIError
+	if errors.As(err, &aerr) && aerr.StatusCode != 0 {
+		statusCode = aerr.StatusCode
+	}
+
+	var errorCode = "server_error"
+	if errors.As(err, &aerr) && aerr.Status != "" {
+		errorCode = aerr.Status
+	}
+
+	w.WriteHeader(statusCode)
+	json.NewEncoder(w).Encode(map[string]any{
+		"error": map[string]any{
+			"message": err.Error(),
+			"type":    errorCode,
+		},
+	})
 }

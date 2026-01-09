@@ -6,6 +6,7 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/openai/openai-go v1.12.0
 	github.com/rs/cors v1.11.1
+	go.jetify.com/sse v0.1.0
 	go.uber.org/zap v1.27.1
 	google.golang.org/genai v1.41.0
 )

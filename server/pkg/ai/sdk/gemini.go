@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 
 	"time"
 
@@ -18,26 +17,6 @@ import (
 type GeminiProvider struct {
 	client *genai.Client
 	model  string
-}
-
-// OpenAIChunk represents standard chat completion chunk
-type OpenAIChunk struct {
-	ID      string   `json:"id"`
-	Object  string   `json:"object"`
-	Created int64    `json:"created"`
-	Model   string   `json:"model"`
-	Choices []Choice `json:"choices"`
-}
-
-type Choice struct {
-	Index        int     `json:"index"`
-	Delta        Delta   `json:"delta"`
-	FinishReason *string `json:"finish_reason"`
-}
-
-type Delta struct {
-	Content string `json:"content,omitempty"`
-	Role    string `json:"role,omitempty"`
 }
 
 // NewGeminiProvider creates a Gemini provider with initialized client
@@ -57,8 +36,8 @@ func NewGeminiProvider(cfg Config) (*GeminiProvider, error) {
 	}, nil
 }
 
-// Stream handles streaming content generation
-func (p *GeminiProvider) Stream(w http.ResponseWriter, req ChatRequest) error {
+// Chat handles content generation
+func (p *GeminiProvider) Chat(ctx context.Context, req ChatRequest, yield func(any) error) error {
 	log := logger.L()
 
 	// Parse messages and convert to Gemini format
@@ -98,31 +77,41 @@ func (p *GeminiProvider) Stream(w http.ResponseWriter, req ChatRequest) error {
 		zap.Int("content_count", len(contents)),
 	)
 
-	ctx := context.Background()
 	stream := p.client.Models.GenerateContentStream(ctx, p.model, contents, config)
 
 	// Generate a stable ID for this stream
 	id := fmt.Sprintf("chatcmpl-%d", time.Now().UnixNano())
 	created := time.Now().Unix()
+	isFirstChunk := true
+	toolCallIndex := 0
 
-	hasWritten := false
 	for resp, err := range stream {
 		if err != nil {
 			log.Error("Gemini stream error", zap.Error(err))
-			if !hasWritten {
-				return p.wrapError(err)
+			return p.wrapError(err)
+		}
+
+		// Send usage from final response
+		var usage *Usage
+		if resp.UsageMetadata != nil {
+			usage = &Usage{
+				PromptTokens:     int(resp.UsageMetadata.PromptTokenCount),
+				CompletionTokens: int(resp.UsageMetadata.CandidatesTokenCount),
+				TotalTokens:      int(resp.UsageMetadata.TotalTokenCount),
 			}
-			// Send mid-stream error as a special event
-			fmt.Fprintf(w, "error: %s\n\n", p.wrapError(err).Error())
-			if f, ok := w.(http.Flusher); ok {
-				f.Flush()
-			}
-			return nil
 		}
 
 		for _, cand := range resp.Candidates {
+			// Map finish reason
+			var finishReason *string
+			if cand.FinishReason != "" {
+				fr := mapGeminiFinishReason(cand.FinishReason)
+				finishReason = &fr
+			}
+
 			if cand.Content != nil {
 				for _, part := range cand.Content.Parts {
+					// Handle text content
 					if part.Text != "" {
 						chunk := OpenAIChunk{
 							ID:      id,
@@ -135,31 +124,84 @@ func (p *GeminiProvider) Stream(w http.ResponseWriter, req ChatRequest) error {
 									Delta: Delta{
 										Content: part.Text,
 									},
+									FinishReason: finishReason,
 								},
 							},
+							Usage: usage,
 						}
-						if !hasWritten {
-							hasWritten = true
+						// Set role on first chunk
+						if isFirstChunk {
+							chunk.Choices[0].Delta.Role = "assistant"
+							isFirstChunk = false
 						}
-
-						data, _ := json.Marshal(chunk)
-						fmt.Fprintf(w, "data: %s\n\n", data)
-						if f, ok := w.(http.Flusher); ok {
-							f.Flush()
+						if err := yield(chunk); err != nil {
+							return nil
 						}
 					}
+
+					// Handle function calls
+					if part.FunctionCall != nil {
+						argsJSON, _ := json.Marshal(part.FunctionCall.Args)
+						chunk := OpenAIChunk{
+							ID:      id,
+							Object:  "chat.completion.chunk",
+							Created: created,
+							Model:   p.model,
+							Choices: []Choice{
+								{
+									Index: 0,
+									Delta: Delta{
+										ToolCalls: []ToolCall{
+											{
+												Index: toolCallIndex,
+												ID:    fmt.Sprintf("call_%d", toolCallIndex),
+												Type:  "function",
+												Function: FunctionCall{
+													Name:      part.FunctionCall.Name,
+													Arguments: string(argsJSON),
+												},
+											},
+										},
+									},
+									FinishReason: finishReason,
+								},
+							},
+							Usage: usage,
+						}
+						if isFirstChunk {
+							chunk.Choices[0].Delta.Role = "assistant"
+							isFirstChunk = false
+						}
+						if err := yield(chunk); err != nil {
+							return nil
+						}
+						toolCallIndex++
+					}
+
+					// Note: Gemini's part.Thought is a bool flag, not content.
+					// Reasoning content is not exposed in the current SDK version.
 				}
 			}
 		}
 	}
 
-	// Send [DONE]
-	fmt.Fprintf(w, "data: [DONE]\n\n")
-	if f, ok := w.(http.Flusher); ok {
-		f.Flush()
-	}
-
 	return nil
+}
+
+// mapGeminiFinishReason converts Gemini finish reasons to OpenAI format
+func mapGeminiFinishReason(reason genai.FinishReason) string {
+	switch reason {
+	case genai.FinishReasonStop:
+		return "stop"
+	case genai.FinishReasonMaxTokens:
+		return "length"
+	case genai.FinishReasonSafety, genai.FinishReasonRecitation, genai.FinishReasonBlocklist:
+		return "content_filter"
+	case genai.FinishReasonOther:
+		return "stop"
+	default:
+		return "stop"
+	}
 }
 
 func (p *GeminiProvider) wrapError(err error) error {
@@ -171,7 +213,7 @@ func (p *GeminiProvider) wrapError(err error) error {
 		return &APIError{
 			Message:    gerr.Message,
 			StatusCode: gerr.Code,
-			Code:       gerr.Status,
+			Status:     gerr.Status,
 		}
 	}
 	return &APIError{Message: err.Error()}

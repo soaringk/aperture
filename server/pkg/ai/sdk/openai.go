@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 
 	"github.com/openai/openai-go"
@@ -33,8 +32,8 @@ func NewOpenAIProvider(cfg Config) (*OpenAIProvider, error) {
 	}, nil
 }
 
-// Stream handles streaming chat completion
-func (p *OpenAIProvider) Stream(w http.ResponseWriter, req ChatRequest) error {
+// Chat handles content generation
+func (p *OpenAIProvider) Chat(ctx context.Context, req ChatRequest, yield func(any) error) error {
 	log := logger.L()
 
 	// Parse messages
@@ -64,38 +63,25 @@ func (p *OpenAIProvider) Stream(w http.ResponseWriter, req ChatRequest) error {
 		zap.Int("message_count", len(messages)),
 	)
 
-	ctx := context.Background()
 	stream := p.client.Chat.Completions.NewStreaming(ctx, openai.ChatCompletionNewParams{
 		Messages: messages,
 		Model:    p.model,
 	})
 
-	hasWritten := false
 	for stream.Next() {
 		chunk := stream.Current()
 		if len(chunk.Choices) > 0 {
-			content := chunk.Choices[0].Delta.Content
-			if content != "" {
-				hasWritten = true
-				fmt.Fprintf(w, "data: %s\n\n", content)
-				if f, ok := w.(http.Flusher); ok {
-					f.Flush()
-				}
+			if err := yield(chunk); err != nil {
+				return nil // Stop on yield error
 			}
 		}
 	}
 
 	if err := stream.Err(); err != nil {
 		log.Error("OpenAI stream error", zap.Error(err))
-		if !hasWritten {
-			return p.wrapError(err)
-		}
-		// Send mid-stream error to client
-		fmt.Fprintf(w, "error: %s\n\n", p.wrapError(err).Error())
-		if f, ok := w.(http.Flusher); ok {
-			f.Flush()
-		}
+		return p.wrapError(err)
 	}
+
 	return nil
 }
 
@@ -118,7 +104,7 @@ func (p *OpenAIProvider) wrapError(err error) error {
 		return &APIError{
 			Message:    msg,
 			StatusCode: statusCode,
-			Code:       oerr.Code,
+			Status:     oerr.Code,
 		}
 	}
 	return &APIError{Message: err.Error()}
