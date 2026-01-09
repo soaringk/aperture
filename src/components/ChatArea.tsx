@@ -604,14 +604,16 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                             color: '#ef4444',
                             fontSize: '0.9rem',
                             display: 'flex',
-                            alignItems: 'center',
+                            alignItems: 'flex-start',
                             gap: '12px',
                             border: '1px solid rgba(239, 68, 68, 0.2)',
-                            background: 'rgba(239, 68, 68, 0.05)'
+                            background: 'rgba(239, 68, 68, 0.05)',
+                            maxWidth: '100%',
+                            wordBreak: 'break-word'
                         }}>
-                            <Sparkles size={16} />
-                            {error}
-                            <button className="btn-reset" onClick={onClearError} style={{ color: 'inherit', opacity: 0.6 }}><X size={14} /></button>
+                            <Sparkles size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
+                            <div style={{ flex: 1 }}>{error}</div>
+                            <button className="btn-reset" onClick={onClearError} style={{ color: 'inherit', opacity: 0.6, flexShrink: 0 }}><X size={14} /></button>
                         </div>
                     </div>
                 )}

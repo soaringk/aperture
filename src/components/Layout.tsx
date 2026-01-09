@@ -20,7 +20,7 @@ export const Layout: React.FC = () => {
         clearError
     } = useAppLogic();
 
-    const [isCollapsed, setIsCollapsed] = React.useState(false);
+    const [isCollapsed, setIsCollapsed] = React.useState(true);
 
     return (
         <div style={{ display: 'flex', width: '100vw', height: '100vh', overflow: 'hidden' }}>
