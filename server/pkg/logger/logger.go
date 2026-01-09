@@ -27,6 +27,7 @@ func Init() {
 			config = zap.NewDevelopmentConfig()
 		}
 		config.Level = zap.NewAtomicLevelAt(level)
+		config.DisableStacktrace = true
 
 		var err error
 		log, err = config.Build()

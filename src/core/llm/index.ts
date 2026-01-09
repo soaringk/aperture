@@ -26,8 +26,20 @@ class LLMService implements LLMStrategy {
         });
 
         if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(errorText || `Request failed with status ${response.status}`);
+            const errorBody = await response.text();
+            let errorMessage = errorBody || `Request failed with status ${response.status}`;
+            try {
+                const parsed = JSON.parse(errorBody);
+                if (parsed.error?.message) {
+                    errorMessage = parsed.error.message;
+                } else if (parsed.error?.code) {
+                    errorMessage = `Request failed with status ${parsed.error.code}`;
+                }
+            } catch (ignore) {
+                // If not JSON, use the raw body or status fallback already set
+                console.error(errorMessage);
+            }
+            throw new Error(errorMessage);
         }
 
         if (!response.body) throw new Error('ReadableStream not supported');

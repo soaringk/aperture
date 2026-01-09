@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 
@@ -85,7 +86,7 @@ func handleChat(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
 
-	// Use pre-initialized provider (client reused, concurrency-safe)
+	// Use pre-initialized provider
 	if err := provider.Stream(w, req); err != nil {
 		log.Error("Stream failed (initial)", zap.Error(err))
 
@@ -93,27 +94,41 @@ func handleChat(w http.ResponseWriter, r *http.Request) {
 
 		// Map error to status code
 		statusCode := http.StatusInternalServerError
-		errMsg := err.Error()
 
-		switch {
-		case strings.Contains(errMsg, "429") || strings.Contains(errMsg, "quota") || strings.Contains(errMsg, "resource exhausted"):
-			statusCode = http.StatusTooManyRequests
-		case strings.Contains(errMsg, "401") || strings.Contains(errMsg, "unauthenticated") || strings.Contains(errMsg, "invalid api key") || strings.Contains(errMsg, "API key not valid"):
-			statusCode = http.StatusUnauthorized
-		case strings.Contains(errMsg, "403") || strings.Contains(errMsg, "permission denied"):
-			statusCode = http.StatusForbidden
-		case strings.Contains(errMsg, "400") || strings.Contains(errMsg, "invalid argument"):
-			statusCode = http.StatusBadRequest
+		var aerr *sdk.APIError
+		if errors.As(err, &aerr) && aerr.StatusCode != 0 {
+			statusCode = aerr.StatusCode
+		} else {
+			// Fallback to heuristic mapping if not a typed APIError
+			errMsg := err.Error()
+			switch {
+			case strings.Contains(errMsg, "429") || strings.Contains(errMsg, "quota") || strings.Contains(errMsg, "resource exhausted"):
+				statusCode = http.StatusTooManyRequests
+			case strings.Contains(errMsg, "401") || strings.Contains(errMsg, "unauthenticated") || strings.Contains(errMsg, "invalid api key") || strings.Contains(errMsg, "API key not valid"):
+				statusCode = http.StatusUnauthorized
+			case strings.Contains(errMsg, "403") || strings.Contains(errMsg, "permission denied"):
+				statusCode = http.StatusForbidden
+			case strings.Contains(errMsg, "400") || strings.Contains(errMsg, "invalid argument"):
+				statusCode = http.StatusBadRequest
+			}
 		}
 
 		w.WriteHeader(statusCode)
+
+		// Determine 'code' for JSON body (prefer string identifier, fallback to status)
+		var errorCode string
+		if errors.As(err, &aerr) {
+			errorCode = aerr.Code
+		}
+
+		errMsg := err.Error()
 
 		// Send JSON error response matching OpenAI error format
 		jsonError := map[string]interface{}{
 			"error": map[string]interface{}{
 				"message": errMsg,
 				"type":    "server_error",
-				"code":    statusCode,
+				"code":    errorCode,
 			},
 		}
 		json.NewEncoder(w).Encode(jsonError)

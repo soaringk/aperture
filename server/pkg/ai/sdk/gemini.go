@@ -3,6 +3,7 @@ package sdk
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -109,10 +110,10 @@ func (p *GeminiProvider) Stream(w http.ResponseWriter, req ChatRequest) error {
 		if err != nil {
 			log.Error("Gemini stream error", zap.Error(err))
 			if !hasWritten {
-				return err
+				return p.wrapError(err)
 			}
 			// Send mid-stream error as a special event
-			fmt.Fprintf(w, "event: error\ndata: %s\n\n", err.Error())
+			fmt.Fprintf(w, "error: %s\n\n", p.wrapError(err).Error())
 			if f, ok := w.(http.Flusher); ok {
 				f.Flush()
 			}
@@ -137,12 +138,7 @@ func (p *GeminiProvider) Stream(w http.ResponseWriter, req ChatRequest) error {
 								},
 							},
 						}
-
 						if !hasWritten {
-							// For the first chunk, logic usually requires role, but OpenAI often sends role in first chunk and content in subsequent.
-							// We'll mimic sending content immediately as that's what we have.
-							// Alternatively we can send an initial role chunk.
-							// For simplicity and compatibility, we just send content.
 							hasWritten = true
 						}
 
@@ -164,4 +160,19 @@ func (p *GeminiProvider) Stream(w http.ResponseWriter, req ChatRequest) error {
 	}
 
 	return nil
+}
+
+func (p *GeminiProvider) wrapError(err error) error {
+	if err == nil {
+		return nil
+	}
+	var gerr genai.APIError
+	if errors.As(err, &gerr) {
+		return &APIError{
+			Message:    gerr.Message,
+			StatusCode: gerr.Code,
+			Code:       gerr.Status,
+		}
+	}
+	return &APIError{Message: err.Error()}
 }

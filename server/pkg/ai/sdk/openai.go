@@ -3,6 +3,7 @@ package sdk
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -87,13 +88,38 @@ func (p *OpenAIProvider) Stream(w http.ResponseWriter, req ChatRequest) error {
 	if err := stream.Err(); err != nil {
 		log.Error("OpenAI stream error", zap.Error(err))
 		if !hasWritten {
-			return err
+			return p.wrapError(err)
 		}
 		// Send mid-stream error to client
-		fmt.Fprintf(w, "error: %s\n\n", err.Error())
+		fmt.Fprintf(w, "error: %s\n\n", p.wrapError(err).Error())
 		if f, ok := w.(http.Flusher); ok {
 			f.Flush()
 		}
 	}
 	return nil
+}
+
+func (p *OpenAIProvider) wrapError(err error) error {
+	if err == nil {
+		return nil
+	}
+	var oerr *openai.Error
+	if errors.As(err, &oerr) {
+		statusCode := oerr.StatusCode
+		if statusCode == 0 && oerr.Response != nil {
+			statusCode = oerr.Response.StatusCode
+		}
+
+		msg := oerr.Message
+		if msg == "" && statusCode != 0 {
+			msg = http.StatusText(statusCode)
+		}
+
+		return &APIError{
+			Message:    msg,
+			StatusCode: statusCode,
+			Code:       oerr.Code,
+		}
+	}
+	return &APIError{Message: err.Error()}
 }

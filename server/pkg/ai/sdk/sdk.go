@@ -2,6 +2,7 @@ package sdk
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 )
 
@@ -17,6 +18,23 @@ type Config struct {
 type ChatRequest struct {
 	Messages     json.RawMessage `json:"messages"`
 	SystemPrompt string          `json:"systemPrompt"`
+}
+
+// APIError represents a unified error from LLM providers
+type APIError struct {
+	Message    string
+	StatusCode int
+	Code       string // String identifier (e.g., "invalid_api_key")
+}
+
+func (e *APIError) Error() string {
+	if e.Message != "" {
+		return e.Message
+	}
+	if e.StatusCode != 0 {
+		return fmt.Sprintf("API Error (Status %d)", e.StatusCode)
+	}
+	return "Unknown Error"
 }
 
 // Provider interface for LLM providers
