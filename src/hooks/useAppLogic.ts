@@ -56,7 +56,9 @@ export function useAppLogic() {
     };
 
     const generateXmlTags = (tags: string[]) => {
-        return tags.map(t => `<context>${t}</context>`).join('\n');
+        if (tags.length === 0) return '';
+        const inner = tags.map(t => `<context>${t}</context>`).join('\n');
+        return `<user_context>\n${inner}\n</user_context>`;
     };
 
     // Send Message
