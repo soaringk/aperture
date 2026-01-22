@@ -1,0 +1,40 @@
+---
+import { type CollectionEntry, getCollection, render } from 'astro:content';
+import Layout from '../../layouts/Layout.astro';
+
+export async function getStaticPaths() {
+	const tools = await getCollection('tools');
+	return tools.map((tool) => ({
+		params: { slug: tool.id },
+		props: tool,
+	}));
+}
+
+type Props = CollectionEntry<'tools'>;
+
+const tool = Astro.props;
+const { Content } = await render(tool);
+---
+
+<Layout title={tool.data.title}>
+	<article class="prose dark:prose-invert prose-zinc max-w-none mx-auto">
+		<header class="mb-8 not-prose border-b border-zinc-200 dark:border-zinc-800 pb-8">
+			<div class="flex items-center gap-4 mb-4">
+                {tool.data.icon && <span class="text-4xl">{tool.data.icon}</span>}
+                <div>
+                    <h1 class="text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-4xl">
+                        {tool.data.title}
+                    </h1>
+                     <p class="text-sm font-mono text-zinc-500 dark:text-zinc-400">v{tool.data.version}</p>
+                </div>
+            </div>
+			<p class="text-lg text-zinc-600 dark:text-zinc-400">
+                {tool.data.description}
+			</p>
+		</header>
+
+        <div class="tool-content">
+		    <Content />
+        </div>
+	</article>
+</Layout>
