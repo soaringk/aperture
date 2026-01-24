@@ -1,0 +1,46 @@
+---
+import { getCollection } from "astro:content";
+import Layout from "@/layouts/Layout.astro";
+import Main from "@/layouts/Main.astro";
+import Header from "@/components/Header.astro";
+import Footer from "@/components/Footer.astro";
+import { SITE } from "@/config";
+
+const tools = await getCollection("tools");
+---
+
+<Layout title={`Tools | ${SITE.title}`}>
+  <Header />
+  <Main pageTitle="Tools" pageDesc="My collection of tools and experiments.">
+    <div class="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2">
+      {
+        tools.map(({ data }) => (
+          <a
+            href={data.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            class="group border-skin-line hover:border-skin-accent bg-skin-card block rounded-lg border p-6 transition-colors"
+          >
+            <article class="space-y-3">
+              <div class="flex items-start justify-between">
+                <h2 class="group-hover:text-skin-accent text-xl font-semibold transition-colors">
+                  {data.title}
+                  <span class="text-skin-base ml-1 inline-block opacity-0 transition-opacity group-hover:opacity-100">
+                    ↗
+                  </span>
+                </h2>
+                {data.version && (
+                  <span class="bg-skin-inverted text-skin-inverted rounded px-2 py-1 font-mono text-xs">
+                    {data.version}
+                  </span>
+                )}
+              </div>
+              <p class="text-skin-base line-clamp-2">{data.description}</p>
+            </article>
+          </a>
+        ))
+      }
+    </div>
+  </Main>
+  <Footer />
+</Layout>
