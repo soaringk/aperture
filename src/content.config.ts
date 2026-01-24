@@ -29,7 +29,7 @@ const tools = defineCollection({
     z.object({
       title: z.string(),
       description: z.string(),
-      url: z.string().url(),
+      url: z.string(),
       icon: z.string().optional(),
       version: z.string().optional(),
       pubDate: z.coerce.date(),

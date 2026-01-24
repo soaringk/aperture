@@ -16,7 +16,11 @@ const tools = await getCollection("tools");
       {
         tools.map(({ data }) => (
           <a
-            href={data.url}
+            href={
+              data.url.startsWith("http")
+                ? data.url
+                : `${SITE.website}${data.url}`
+            }
             target="_blank"
             rel="noopener noreferrer"
             class="group border-skin-line hover:border-skin-accent bg-skin-card block rounded-lg border p-6 transition-colors"
