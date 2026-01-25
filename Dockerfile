@@ -18,21 +18,17 @@ COPY . .
 RUN npm run build
 
 # ============================================
-# Stage 2: Build Aperture (Vite)
+# Stage 2: Build Aperture-Tools (Vite)
 # ============================================
 FROM node:20-alpine AS aperture-builder
 
 WORKDIR /app/aperture
 
-# We need to copy from the aperture repo
-# This expects the context to include ../aperture
-# OR you can build separately - see instructions below
-ARG APERTURE_PATH=../aperture
-
-COPY ${APERTURE_PATH}/package*.json ./
+# Build from submodule at ./aperture-tools
+COPY aperture-tools/package*.json ./
 RUN npm ci
 
-COPY ${APERTURE_PATH} .
+COPY aperture-tools/ .
 RUN npm run build
 
 # ============================================
@@ -45,8 +41,7 @@ COPY --from=blog-builder /app/blog/dist /var/www/blog
 COPY --from=aperture-builder /app/aperture/dist /var/www/aperture
 
 # Copy nginx config
-COPY nginx/default.conf /etc/nginx/conf.d/default.conf
-COPY nginx/ssl.conf /etc/nginx/conf.d/ssl.conf 2>/dev/null || true
+COPY nginx/ /etc/nginx/conf.d/
 
 EXPOSE 80 443
 

@@ -11,7 +11,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BLOG_DIR="$(dirname "$SCRIPT_DIR")"
-APERTURE_DIR="${APERTURE_DIR:-$BLOG_DIR/../aperture-tools}"
+APERTURE_DIR="${APERTURE_DIR:-$BLOG_DIR/aperture-tools}"
 OUTPUT_DIR="$BLOG_DIR/deploy"
 
 echo "🚀 Building unified frontend..."

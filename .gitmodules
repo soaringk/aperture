@@ -1,0 +1,3 @@
+[submodule "aperture-tools"]
+	path = aperture-tools
+	url = https://github.com/soaringk/aperture-tools.git

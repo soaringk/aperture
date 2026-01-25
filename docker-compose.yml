@@ -7,8 +7,8 @@ services:
       - backend
 
   backend:
-    build: ../aperture/server
+    build: ./aperture-tools/server
     ports:
       - "8080:8080"
     env_file:
-      - ../aperture/server/.env
+      - ./aperture-tools/server/.env

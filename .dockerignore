@@ -1,8 +1,21 @@
-# Ignore Astro files
-*.astro
-
-# Ignore node_modules directory
+# Ignore node_modules - each stage installs its own
 node_modules/
+aperture-tools/node_modules/
 
-# Ignore build output
+# Ignore build output - each stage builds fresh
 dist/
+aperture-tools/dist/
+
+# Git
+.git/
+.gitignore
+aperture-tools/.git
+
+# IDE
+.vscode/
+.idea/
+
+# Local dev files
+*.log
+.env
+.env.*
