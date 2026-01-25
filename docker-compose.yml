@@ -1,9 +1,14 @@
 services:
-  app:
-    image: node:lts
+  frontend:
+    build: .
     ports:
-      - 4321:4321
-    working_dir: /app
-    command: npm run dev -- --host 0.0.0.0
-    volumes:
-      - ./:/app
+      - "80:80"
+    depends_on:
+      - backend
+
+  backend:
+    build: ../aperture/server
+    ports:
+      - "8080:8080"
+    env_file:
+      - ../aperture/server/.env
