@@ -4,7 +4,7 @@ set -e
 # =============================================================================
 # Unified Build & Deploy Script for Aperture
 # =============================================================================
-# This script builds both frontends locally and prepares them for deployment.
+# This script builds blog, frontend, and backend locally.
 #
 # For Docker deployment, see the simpler workflow below.
 # =============================================================================
@@ -14,7 +14,7 @@ BLOG_DIR="$(dirname "$SCRIPT_DIR")"
 APERTURE_DIR="${APERTURE_DIR:-$BLOG_DIR/aperture-tools}"
 OUTPUT_DIR="$BLOG_DIR/deploy"
 
-echo "🚀 Building unified frontend..."
+echo "🚀 Building unified stack..."
 echo "   Blog:     $BLOG_DIR"
 echo "   Aperture: $APERTURE_DIR"
 echo "   Output:   $OUTPUT_DIR"
@@ -24,6 +24,7 @@ echo ""
 rm -rf "$OUTPUT_DIR"
 mkdir -p "$OUTPUT_DIR/blog"
 mkdir -p "$OUTPUT_DIR/aperture"
+mkdir -p "$OUTPUT_DIR/bin"
 
 # Build Blog (Astro)
 echo "📝 Building Blog..."
@@ -31,11 +32,16 @@ cd "$BLOG_DIR"
 npm run build
 cp -r dist/* "$OUTPUT_DIR/blog/"
 
-# Build Aperture (Vite)
-echo "🔧 Building Aperture..."
+# Build Aperture Frontend (Vite)
+echo "🔧 Building Aperture Frontend..."
 cd "$APERTURE_DIR"
 npm run build
 cp -r dist/* "$OUTPUT_DIR/aperture/"
+
+# Build Backend (Go)
+echo "⚙️  Building Backend..."
+cd "$APERTURE_DIR/server"
+go build -o "$OUTPUT_DIR/bin/aperture-server" .
 
 # Copy nginx config
 mkdir -p "$OUTPUT_DIR/nginx"
@@ -48,6 +54,7 @@ echo "Output structure:"
 echo "  $OUTPUT_DIR/"
 echo "  ├── blog/       # Astro static files -> /var/www/blog"
 echo "  ├── aperture/   # Vite static files -> /var/www/aperture"
+echo "  ├── bin/        # Go backend binary"
 echo "  └── nginx/      # Nginx config"
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -68,6 +75,7 @@ echo ""
 echo "Option 2: Copy Static Files"
 echo "  1. scp -r deploy/blog/* user@server:/var/www/blog/"
 echo "  2. scp -r deploy/aperture/* user@server:/var/www/aperture/"
-echo "  3. scp deploy/nginx/default.conf user@server:/etc/nginx/conf.d/"
-echo "  4. ssh user@server 'sudo systemctl reload nginx'"
+echo "  3. scp deploy/bin/aperture-server user@server:/usr/local/bin/"
+echo "  4. scp deploy/nginx/default.conf user@server:/etc/nginx/conf.d/"
+echo "  5. ssh user@server 'sudo systemctl reload nginx'"
 echo ""
