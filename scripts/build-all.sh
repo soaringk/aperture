@@ -2,7 +2,7 @@
 set -e
 
 # =============================================================================
-# Unified Build & Deploy Script for Grimoire
+# Unified Build & Deploy Script for Aperture
 # =============================================================================
 # This script builds both frontends locally and prepares them for deployment.
 #
@@ -58,12 +58,12 @@ echo "Option 1: Docker (Recommended)"
 echo "  Build locally, push image to registry, pull on server."
 echo ""
 echo "  # On your local machine:"
-echo "  docker build -t your-registry/grimoire:latest ."
-echo "  docker push your-registry/grimoire:latest"
+echo "  docker build -t your-registry/aperture:latest ."
+echo "  docker push your-registry/aperture:latest"
 echo ""
 echo "  # On your server:"
-echo "  docker pull your-registry/grimoire:latest"
-echo "  docker run -d -p 80:80 -p 443:443 your-registry/grimoire:latest"
+echo "  docker pull your-registry/aperture:latest"
+echo "  docker run -d -p 80:80 -p 443:443 your-registry/aperture:latest"
 echo ""
 echo "Option 2: Copy Static Files"
 echo "  1. scp -r deploy/blog/* user@server:/var/www/blog/"

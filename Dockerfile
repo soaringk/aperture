@@ -1,6 +1,6 @@
 # Multi-Stage Dockerfile
 # Builds both frontends and serves via nginx - no pre-build required
-# Usage: docker build -t grimoire .
+# Usage: docker build -t aperture .
 
 # ============================================
 # Stage 1: Build Blog (Astro)
